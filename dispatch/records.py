@@ -182,7 +182,11 @@ def load_record(run_id):
     path = run_dir(run_id) / "run.json"
     if not path.is_file():
         raise DispatchError(f"no such run: {run_id}")
-    return bind_record_location(json.loads(path.read_text(encoding="utf-8")), run_id)
+    try:
+        found = json.loads(read_regular_bytes(path, RECORD_BYTE_LIMIT))
+    except (OSError, ValueError) as exc:
+        raise DispatchError(f"{run_id}: run.json is not a readable record: {exc}") from exc
+    return bind_record_location(found, run_id)
 
 
 def atomic_replace(tmp, path):
@@ -439,12 +443,12 @@ def read_text(path):
 def read_tail_bytes(path, limit):
     """The last `limit` bytes of a file, decoded. Never the whole file."""
     try:
-        with open(path, "rb") as fh:
+        with os.fdopen(open_regular_fd(path, os.O_RDONLY), "rb") as fh:
             fh.seek(0, os.SEEK_END)
             size = fh.tell()
             fh.seek(max(0, size - limit))
             return fh.read(limit).decode("utf-8", "replace")
-    except OSError:
+    except (OSError, DispatchError):
         return ""
 
 

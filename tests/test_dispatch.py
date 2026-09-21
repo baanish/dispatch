@@ -2926,7 +2926,8 @@ class TestLogTail(unittest.TestCase):
                 patch.object(Path, "stat") as stat, \
                 patch.object(Path, "read_text", side_effect=AssertionError(
                     "tail must not read the whole text file")), \
-                patch.object(records, "open", create=True,
+                patch.object(records, "open_regular_fd", return_value=-1), \
+                patch.object(records.os, "fdopen",
                              side_effect=lambda *args: LogBytes(data)):
             stat.return_value.st_size = len(data)
             reader = cli.non_heartbeat_tail if meaningful else cli.tail_lines
@@ -2991,8 +2992,9 @@ class TestLogTail(unittest.TestCase):
                 self.seek(position)
                 return super().read(size)
 
-        with patch.object(records, "open", create=True,
-                          return_value=GrowingLog(b"old\n" * 2000)):
+        with patch.object(records, "open_regular_fd", return_value=-1), \
+                patch.object(records.os, "fdopen",
+                             return_value=GrowingLog(b"old\n" * 2000)):
             self.assertEqual(records.read_tail_bytes("status.log", 4096),
                              "old\n" * 1024)
 
