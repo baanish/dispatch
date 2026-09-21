@@ -340,7 +340,7 @@ def read_tail_bytes(path, limit):
             fh.seek(0, os.SEEK_END)
             size = fh.tell()
             fh.seek(max(0, size - limit))
-            return fh.read().decode("utf-8", "replace")
+            return fh.read(limit).decode("utf-8", "replace")
     except OSError:
         return ""
 

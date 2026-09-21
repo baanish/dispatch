@@ -2390,6 +2390,93 @@ class TestOrchestration(HerdrStubTestCase):
 # --------------------------------------------------------------------------
 
 
+class TestLogTail(unittest.TestCase):
+    def read_tail(self, data, count, meaningful=False):
+        reads = []
+
+        class LogBytes(io.BytesIO):
+            def read(self, size=-1):
+                if size < 0:
+                    raise AssertionError("tail reads must have a byte limit")
+                result = super().read(size)
+                reads.append(len(result))
+                return result
+
+        with patch.object(Path, "is_file", return_value=True), \
+                patch.object(Path, "stat") as stat, \
+                patch.object(Path, "read_text", side_effect=AssertionError(
+                    "tail must not read the whole text file")), \
+                patch.object(records, "open", create=True,
+                             side_effect=lambda *args: LogBytes(data)):
+            stat.return_value.st_size = len(data)
+            reader = cli.non_heartbeat_tail if meaningful else cli.tail_lines
+            result = reader(Path("status.log"), count)
+        return result, reads
+
+    def test_large_log_reads_only_a_bounded_suffix(self):
+        data = b"old\n" * 250000 + b"first\nHEARTBEAT pulse\n\nlast\n"
+        for meaningful, expected in ((False, ["", "last"]),
+                                     (True, ["first", "last"])):
+            with self.subTest(meaningful=meaningful):
+                result, reads = self.read_tail(data, 2, meaningful)
+                self.assertEqual(result, expected)
+                self.assertEqual(reads, [4096])
+
+    def test_expands_past_heartbeats_and_a_partial_line(self):
+        data = (b"old\n" * 250000 + b"wanted\n" + b"HEARTBEAT pulse\n" * 500
+                + b"last\n")
+        result, reads = self.read_tail(data, 2, meaningful=True)
+        self.assertEqual(result, ["wanted", "last"])
+        self.assertEqual(reads, [4096, 8192])
+
+    def test_long_multibyte_line_is_returned_whole(self):
+        line = "\u20ac" * 2000
+        result, reads = self.read_tail(b"old\n" * 250000
+                                       + (line + "\nlast").encode(), 2)
+        self.assertEqual(result, [line, "last"])
+        self.assertEqual(reads, [4096, 8192])
+
+    def test_fewer_meaningful_lines_expands_to_the_start(self):
+        for prefix, expected in ((b"", []), (b"only\n", ["only"])):
+            data = prefix + b"HEARTBEAT pulse\n" * 600
+            result, reads = self.read_tail(data, 2, meaningful=True)
+            self.assertEqual(result, expected)
+            self.assertEqual(reads, [4096, 8192, len(data)])
+
+    def test_short_empty_and_invalid_utf8_match_text_tail(self):
+        for data in (b"", b"only", b"one\r\ntwo\rthree\n\n",
+                     b"bad\xff\nHEARTBEAT pulse\n \nlast",
+                     "a\u2028b\nc\n".encode()):
+            for meaningful in (False, True):
+                for count in (1, 8, 0, -1):
+                    with self.subTest(data=data, meaningful=meaningful, count=count):
+                        expected = data.decode("utf-8", "replace").splitlines()
+                        if meaningful:
+                            expected = [line for line in expected if line.strip()
+                                        and not line.startswith("HEARTBEAT ")]
+                        result, _ = self.read_tail(data, count, meaningful)
+                        self.assertEqual(result, expected[-count:])
+
+    def test_missing_file_has_no_tail(self):
+        with patch.object(Path, "is_file", return_value=False):
+            self.assertEqual(cli.tail_lines("missing", 2), [])
+            self.assertEqual(cli.non_heartbeat_tail("missing", 2), [])
+
+    def test_byte_limit_holds_when_file_grows_after_seek(self):
+        class GrowingLog(io.BytesIO):
+            def read(self, size=-1):
+                position = self.tell()
+                self.seek(0, os.SEEK_END)
+                self.write(b"new\n" * 10000)
+                self.seek(position)
+                return super().read(size)
+
+        with patch.object(records, "open", create=True,
+                          return_value=GrowingLog(b"old\n" * 2000)):
+            self.assertEqual(records.read_tail_bytes("status.log", 4096),
+                             "old\n" * 1024)
+
+
 class TestWatch(HerdrStubTestCase):
     def test_the_wall_lists_a_live_run_with_its_pane_and_agent(self):
         rec = self.unwatched_bg_run()

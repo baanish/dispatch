@@ -630,11 +630,23 @@ def kill_on_machine(rec):
     return EXIT_OK
 
 
-def tail_lines(path, count):
-    if not Path(path).is_file():
+def tail_lines(path, count, *, skip_heartbeats=False):
+    path = Path(path)
+    if not path.is_file():
         return []
-    text = Path(path).read_text(encoding="utf-8", errors="replace")
-    return text.splitlines()[-count:]
+    size = path.stat().st_size
+    limit = 4096
+    while True:
+        lines = read_tail_bytes(path, limit).splitlines()
+        if limit < size:
+            # The first line may start mid-character or mid-heartbeat.
+            lines = lines[1:]
+        if skip_heartbeats:
+            lines = [line for line in lines
+                     if line.strip() and not line.startswith("HEARTBEAT ")]
+        if limit >= size or (count > 0 and len(lines) >= count):
+            return lines[-count:]
+        limit = min(size, limit * 2)
 
 
 def non_heartbeat_tail(path, count):
@@ -643,13 +655,7 @@ def non_heartbeat_tail(path, count):
     A run that has been up for an hour has hundreds of heartbeat lines and maybe
     six that matter; a plain tail shows nothing but the pulse.
     """
-    path = Path(path)
-    if not path.is_file():
-        return []
-    lines = [line for line
-             in path.read_text(encoding="utf-8", errors="replace").splitlines()
-             if line.strip() and not line.startswith("HEARTBEAT ")]
-    return lines[-count:]
+    return tail_lines(path, count, skip_heartbeats=True)
 
 
 def head_lines(text, count):
