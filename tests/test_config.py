@@ -52,7 +52,13 @@ class ConfigTestCase(unittest.TestCase):
         self.env_backup = dict(os.environ)
         self.addCleanup(self._restore_env)
         os.environ["HOME"] = str(self.home)
+        # Windows finds the home through USERPROFILE, not HOME. Checked before
+        # any case runs, because `init --force` and the skill install write to
+        # wherever `Path.home()` says, and that must never be the real one.
+        os.environ["USERPROFILE"] = str(self.home)
+        self.assertEqual(Path.home().resolve(), self.home.resolve())
         os.environ.pop(config.CONFIG_ENV, None)
+        os.environ.pop("DISPATCH_SUBSTRATE", None)
 
         self.cwd_backup = os.getcwd()
         self.addCleanup(os.chdir, self.cwd_backup)

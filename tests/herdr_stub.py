@@ -937,6 +937,10 @@ class HerdrStubTestCase(unittest.TestCase):
         empty_config.write_text("", encoding="utf-8")
         os.environ[config.CONFIG_ENV] = str(empty_config)
         os.environ["AGENT_DEPTH"] = "0"
+        # Pinned, because the variable outranks the config: a contributor who
+        # exports `DISPATCH_SUBSTRATE=headless` would have this suite start the
+        # real vendor CLIs on their PATH instead of talking to the stub.
+        os.environ["DISPATCH_SUBSTRATE"] = "herdr"
         # The transport self-heal spawns a real `herdr server` when it finds
         # nothing listening, and several cases point the client at a socket that
         # never existed. Tests that want the repair path patch

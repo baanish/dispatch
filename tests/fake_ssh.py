@@ -143,6 +143,7 @@ class FakeSshTestCase(unittest.TestCase):
         os.environ["DISPATCH_HOME"] = str(self.home)
         os.environ["AGENT_DEPTH"] = "0"
         os.environ["DISPATCH_SESSION"] = "test-session"
+        os.environ.pop("DISPATCH_SUBSTRATE", None)
         # Nothing in these cases needs a substrate, and a real herdr must never
         # be started to find that out.
         os.environ[herdr.SPAWN_ENV] = "0"
