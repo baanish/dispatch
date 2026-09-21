@@ -37,7 +37,8 @@ from .prompt import steer_prompt
 from .records import (COMPLETE_MARKER, RunOptions, all_records, append_status,
                       hold_run_lock, last_heartbeat_age, load_record, read_output,
                       read_status_head, read_tail_bytes, read_text,
-                      release_run_lock, runs_root, sanitize_log_line, save_record,
+                      release_run_lock, runs_lock, runs_root, sanitize_log_line,
+                      save_record,
                       stamp_epoch, utc_now, validate_run_id)
 from .runner import (STEER_INTERRUPT_SECONDS, RunWrapper, SubstrateSweep,
                      checkin_count, execute_run, finalize_output, finalize_schema,
@@ -459,7 +460,10 @@ def cmd_status(args):
         return EXIT_OK
     # Reading status is also what settles detached runs: no supervisor process
     # exists to do it, so the operator looking is the trigger.
-    with contextlib.suppress(SubstrateError, OSError):
+    # Under the runs lock, like the sweep a reservation makes: a run that was
+    # reserved a moment ago has no owner lock yet, and a sweep that met it
+    # outside the lock abandoned it as one whose launcher had died.
+    with contextlib.suppress(SubstrateError, OSError), runs_lock():
         live_records(sweep())
     records = all_records()
     rows = []
