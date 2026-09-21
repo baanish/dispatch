@@ -47,7 +47,7 @@ from .runner import (STEER_INTERRUPT_SECONDS, RunWrapper, SubstrateSweep,
                      judge_liveness, note_deliverable, prepare_run, reconcile_run,
                      record_worker,
                      refresh_session_id, run_agent_name, start_run_background,
-                     warn_metered_key)
+                     warn_metered_key, worker_belongs_to_run)
 from .substrates import detect_substrate, get_substrate
 from .substrates.base import SubstrateError, Worker
 
@@ -472,7 +472,10 @@ def cmd_steer(args):
     wrapper = RunWrapper(substrate, rec)
     wrapper.attach()
     info = substrate.process_info(wrapper.worker)
-    if info is None:
+    if info is None or not worker_belongs_to_run(rec, substrate):
+        # Gone, or its id now names somebody else's worker: pane ids start
+        # again when a substrate restarts, and the correction would be typed
+        # into another run.
         append_status(status_path, f"STEER {utc_now()} the home is gone")
         return cmd_continue(args)
 

@@ -2292,6 +2292,20 @@ class TestKill(HerdrStubTestCase):
             watcher.deliverable_is_settled()
             self.assertTrue(watcher.deliverable_is_settled())
 
+    def test_steer_never_types_into_a_pane_that_now_belongs_to_another_run(self):
+        """Pane ids start again when a substrate restarts, so the id on an old
+        record can name somebody else's live worker."""
+        rec = self.make_live_record()
+        self.stub.panes[rec["worker_id"]].running = True
+        self.stub.panes[rec["worker_id"]].turn_polls = 10_000
+        rec["shell_pid"] = 999_999            # not the shell in that pane now
+        records.save_record(rec)
+        prompts = len(self.stub.prompts)
+        with contextlib.redirect_stderr(io.StringIO()):
+            self.run_cli("steer", rec["id"], "use the other table")
+        self.assertEqual(len(self.stub.prompts), prompts, "typed into a stranger")
+        self.assertEqual(records.load_record(rec["id"])["state"], "orphaned")
+
     def test_steer_marks_the_new_turn_before_it_types(self):
         rec = self.make_live_record()
         self.stub.panes[rec["worker_id"]].running = True
