@@ -245,7 +245,7 @@ def mkdir_command(machine, path):
         return (POWERSHELL_PREFIX
                 + f"[void][System.IO.Directory]::CreateDirectory({quote_powershell(path)})")
     # The staging directory holds the brief, and the machine may be shared.
-    return "umask 077; " + remote_command(["mkdir", "-p", path])
+    return "umask 077; " + remote_command(["mkdir", "-p", "--", path])
 
 
 def read_command(machine, path):
@@ -253,7 +253,7 @@ def read_command(machine, path):
         return (POWERSHELL_PREFIX
                 + "Get-Content -Raw -Encoding UTF8 -ErrorAction Stop -LiteralPath "
                 + quote_powershell(path))
-    return remote_command(["cat", path])
+    return remote_command(["cat", "--", path])
 
 
 def scp_path(machine, path):
@@ -321,12 +321,37 @@ def ssh_failure(machine, proc):
     return f"machine {machine.name}: {tail}"
 
 
+def scp_argv(machine, operands):
+    """One scp command line: SFTP selected, and its options closed.
+
+    `-s` asks for SFTP rather than the legacy scp protocol, which is the
+    protocol `scp_path` already writes for: the remote pathname crosses raw,
+    and the legacy protocol would hand it to a shell on the machine. It needs
+    OpenSSH 8.7 or later, and an older client failing loudly is the point.
+
+    `--` ends the options, because every operand after it is a path somebody
+    gave dispatch, and one beginning with `-` is otherwise scp's own option:
+    `-S program` names the program scp runs here to make the connection.
+    """
+    return ["scp", "-s", *ssh_options(machine), "--", *operands]
+
+
+def local_operand(path):
+    """A local path in the form scp has to be given it: absolute.
+
+    A relative path whose first component holds a `:` is `host:path` to scp,
+    and the file it would copy is on a machine of that name. A leading `/` is
+    what says the name is this machine's.
+    """
+    return str(Path(path).absolute())
+
+
 def scp_up(machine, paths, remote_dir):
     """Copy local files into a directory on the machine."""
     if not paths:
         return
-    argv = ["scp", *ssh_options(machine), *[str(p) for p in paths],
-            f"{machine.ssh}:{scp_path(machine, remote_dir)}/"]
+    argv = scp_argv(machine, [*[local_operand(p) for p in paths],
+                              f"{machine.ssh}:{scp_path(machine, remote_dir)}/"])
     run_program(machine, argv, SCP_SECONDS, check=True)
 
 
@@ -334,11 +359,11 @@ def scp_down(machine, remote_path, local_path, seconds=SCP_SECONDS):
     """Copy one file off the machine. False when it was not there."""
     # Into a name nobody could have put a link at, then moved over the target:
     # scp writes through whatever is already at its destination.
-    local_path = Path(local_path)
+    local_path = Path(local_path).absolute()
     landing = local_path.with_name(
         f".{local_path.name}.{os.getpid()}.{uuid.uuid4().hex[:8]}.part")
-    argv = ["scp", *ssh_options(machine),
-            f"{machine.ssh}:{scp_path(machine, remote_path)}", str(landing)]
+    argv = scp_argv(machine, [f"{machine.ssh}:{scp_path(machine, remote_path)}",
+                              local_operand(landing)])
     try:
         if run_program(machine, argv, seconds, check=False).returncode != 0:
             return False
@@ -736,7 +761,12 @@ def steer_remote(rec, message, deadline=""):
     every account on it.
     """
     machine = machine_of_record(rec)
-    path = stage_file(rec, machine, f"steer-{time.strftime('%H%M%S')}.md", message)
+    # The machine reads the staged file after the command reaches it, so two
+    # steers in the same second sharing a name is one of them delivering the
+    # other's correction, twice.
+    path = stage_file(rec, machine,
+                      f"steer-{time.strftime('%H%M%S')}-{uuid.uuid4().hex[:8]}.md",
+                      message)
     argv = [machine.dispatch, "steer", rec["remote_id"], "--message-file", path]
     if deadline:
         argv += ["--deadline", deadline]

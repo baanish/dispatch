@@ -118,6 +118,36 @@ class TestRemoteLaunch(FakeSshTestCase):
                   / "brief.md")
         self.assertEqual(staged.read_text(encoding="utf-8"), "do the thing\n")
 
+    def test_an_uploaded_path_is_an_operand_and_never_one_of_scps_options(self):
+        """The brief, the schema, and the image are paths somebody gave
+        dispatch, and scp reads one beginning with `-` as its own option:
+        `-S program` is the program scp runs on this machine to connect."""
+        self.launched()
+        self.run_remote_bg()
+        transfers = self.calls("scp")
+        self.assertTrue(transfers)
+        for call in transfers:
+            # SFTP is what the raw remote pathname is written for, so it is
+            # asked for rather than assumed.
+            self.assertEqual(call["argv"][0], "-s")
+            self.assertIn("--", call["argv"])
+            for operand in call["paths"]:
+                if not operand.startswith(f"{self.machine_ssh}:"):
+                    self.assertTrue(os.path.isabs(operand), operand)
+
+    def test_a_brief_under_a_directory_with_a_colon_in_its_name_still_goes_up(self):
+        """scp reads `a:b/brief.md` as a path on a machine called `a`, and
+        fetches it over another connection instead of uploading the file."""
+        folder = self.work / "a:b"
+        folder.mkdir()
+        (folder / "brief.md").write_text("do the thing\n", encoding="utf-8")
+        self.launched()
+        self.assertEqual(cli.main(["run", "astra@medium", "a:b/brief.md", "--bg",
+                                   "--on", self.machine_name]), cli.EXIT_OK)
+        rec = records.all_records()[-1]
+        staged = self.remote_root / ".dispatch" / "remote" / rec["id"] / "brief.md"
+        self.assertEqual(staged.read_text(encoding="utf-8"), "do the thing\n")
+
     def test_the_launch_is_journaled_where_the_operator_looks(self):
         run_id, _ = self.launched()
         rec = self.run_remote_bg()
@@ -317,6 +347,18 @@ class TestRemoteProxy(FakeSshTestCase):
         self.assertEqual(len(staged), 1)
         self.assertEqual(staged[0].read_text(encoding="utf-8"),
                          "stop and read the tests")
+
+    def test_two_steers_in_one_second_stage_two_files(self):
+        """The machine reads the staged message after the command gets there,
+        so one name for both is one steer delivering the other's correction."""
+        self.set_replies([["dispatch steer", {"stdout": "steered\n"}]])
+        with patch.object(remote.time, "strftime", return_value="120000"):
+            self.main_out(["steer", self.rec["id"], "read the tests first"])
+            self.main_out(["steer", self.rec["id"], "then run them"])
+        staged = (self.remote_root / ".dispatch" / "remote"
+                  / self.rec["id"]).glob("steer-*.md")
+        self.assertEqual({path.read_text(encoding="utf-8") for path in staged},
+                         {"read the tests first", "then run them"})
 
     def test_a_message_may_also_come_from_a_file(self):
         note = self.work / "note.md"

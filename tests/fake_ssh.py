@@ -67,14 +67,14 @@ def run_ssh():
     tail = command.rsplit("; ", 1)[-1].strip()
     words = shlex.split(tail)
     if words[:1] == ["cat"]:
-        path = local_path(words[1])
+        path = local_path(words[-1])
         if not path.is_file():
-            sys.stderr.write("cat: %s: No such file or directory\\n" % words[1])
+            sys.stderr.write("cat: %s: No such file or directory\\n" % words[-1])
             return 1
         sys.stdout.write(path.read_text(encoding="utf-8"))
         return 0
     if words[:2] == ["mkdir", "-p"]:
-        local_path(words[2]).mkdir(parents=True, exist_ok=True)
+        local_path(words[-1]).mkdir(parents=True, exist_ok=True)
         return 0
     for match, reply in replies():
         if match in command:
@@ -85,22 +85,23 @@ def run_ssh():
 
 
 def split_spec(spec):
-    # scp speaks SFTP, so the remote half is a literal pathname, not a shell word.
-    if ":" not in spec:
+    # scp speaks SFTP, so the remote half is a literal pathname, not a shell
+    # word. A colon names a machine only before the first slash, which is what
+    # keeps an absolute local path holding one a local path.
+    if ":" not in spec.split("/", 1)[0]:
         return "", spec
     host, path = spec.split(":", 1)
     return host, path
 
 
 def run_scp():
-    paths = [a for a in ARGV if not a.startswith("-")]
-    # Every option dispatch passes takes a value, so the values are dropped with
-    # them; what is left is the sources and the destination.
-    values = set()
-    for index, item in enumerate(ARGV):
-        if item.startswith("-") and index + 1 < len(ARGV):
-            values.add(ARGV[index + 1])
-    paths = [p for p in paths if p not in values]
+    # dispatch closes scp's options with `--`, so everything after it is an
+    # operand, exactly as scp itself reads them.
+    if "--" not in ARGV:
+        log({{"argv": ARGV, "paths": []}})
+        sys.stderr.write("scp: options were not closed with --\\n")
+        return 1
+    paths = ARGV[ARGV.index("--") + 1:]
     log({{"argv": ARGV, "paths": paths}})
     sources, dest = paths[:-1], paths[-1]
     dest_host, dest_path = split_spec(dest)
