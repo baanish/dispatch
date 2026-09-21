@@ -2185,6 +2185,34 @@ class TestKill(HerdrStubTestCase):
                 with records.runs_lock():
                     self.fail("entered the critical section without the lock")
 
+    def test_a_stale_writer_cannot_change_how_a_run_ended(self):
+        """A watcher mid-poll still holds `running` after `kill` wrote `killed`,
+        and a late finalizer still holds its own verdict after `done` landed."""
+        rec = self.make_live_record()
+        stale = dict(rec)
+        rec.update(state="killed", finished=records.utc_now(), closed_by="kill")
+        records.save_record(rec)
+
+        stale["session_id"] = "noted-late"
+        records.save_record(stale)                  # a plain write
+        records.save_heartbeat(dict(stale))         # a heartbeat
+        stale.update(state="done", rc=0, closed_by="runner")
+        records.save_final_record(stale)            # a finalizer
+
+        settled = records.load_record(rec["id"])
+        self.assertEqual((settled["state"], settled["closed_by"]), ("killed", "kill"))
+        self.assertNotEqual(settled.get("rc"), 0)
+        self.assertEqual(settled["session_id"], "noted-late")
+
+    def test_an_orphaned_guess_gives_way_to_the_real_ending(self):
+        rec = self.make_live_record()
+        late = dict(rec)
+        rec.update(state="orphaned", finished=records.utc_now(), closed_by="reconcile")
+        records.save_record(rec)
+        late.update(state="done", rc=0, closed_by="runner")
+        records.save_final_record(late)
+        self.assertEqual(records.load_record(rec["id"])["state"], "done")
+
     def test_kill_writes_its_terminal_state_under_the_runs_lock(self):
         """A watcher finishing at the same moment reads, decides, then writes.
 
@@ -2548,7 +2576,9 @@ class TestWatch(HerdrStubTestCase):
             "%Y-%m-%dT%H:%M:%SZ",
             time.gmtime(time.time() - cli.WATCH_RECENT_SECONDS - 60))
         rec["started_at"] = time.time() - cli.WATCH_RECENT_SECONDS - 120
-        records.save_record(rec)
+        # Straight to the file: `save_record` keeps the ending already on disk,
+        # `finished` included, so it cannot backdate one.
+        (Path(rec["dir"]) / "run.json").write_text(json.dumps(rec), encoding="utf-8")
         _, output = self.capture_stdout("watch")
         self.assertNotIn(rec["id"], output)
         self.assertIn("no runs in the last", output)

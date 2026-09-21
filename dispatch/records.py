@@ -274,29 +274,47 @@ def save_record(rec):
     """
     path = Path(rec["dir"]) / "run.json"
     tmp = path.with_name(f"run.json.{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp")
-    tmp.write_text(json.dumps(rec, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    atomic_replace(tmp, path)
+    with runs_lock():
+        keep_the_ending_on_disk(rec, path)
+        tmp.write_text(json.dumps(rec, indent=2, sort_keys=True) + "\n",
+                       encoding="utf-8")
+        atomic_replace(tmp, path)
+
+
+# How a run ended. Written once, by whoever ended it, and carried by every
+# later write of that record.
+OUTCOME_FIELDS = ("state", "rc", "finished", "closed_by", "error")
+
+
+def keep_the_ending_on_disk(rec, path):
+    """Once a run has ended on disk, no later write changes how it ended.
+
+    Every writer publishes the whole record from the copy it holds, and those
+    copies go stale: a watcher mid-poll still holds `running` after `kill` has
+    written `killed`, and a second finalizer still holds its own verdict after
+    the first has published `done`. Atomic replace keeps the file whole and does
+    nothing about that. `orphaned` is the exception, because it is dispatch's
+    guess that nobody is left, and a process that then reports the real ending
+    knows better.
+    """
+    from .policy import policy
+
+    try:
+        on_disk = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return
+    ended = on_disk.get("state")
+    if ended in policy().terminal_states and ended != "orphaned":
+        for field in OUTCOME_FIELDS:
+            if field in on_disk:
+                rec[field] = on_disk[field]
+            else:
+                rec.pop(field, None)
 
 
 def save_final_record(rec):
-    """Close a run without clobbering a terminal state another process wrote.
-
-    A run has more than one writer in play: whoever is watching or reconciling
-    it, and whatever `kill` the operator ran. Whoever wrote last used to win, so
-    an explicit kill could be overwritten by a reconciler's `done`.
-    """
-    with runs_lock():
-        path = Path(rec["dir"]) / "run.json"
-        if path.is_file():
-            try:
-                on_disk = json.loads(path.read_text(encoding="utf-8"))
-            except ValueError:
-                on_disk = {}
-            claimed = on_disk.get("state")
-            if claimed in ("killed", "aborted") and rec.get("state") != claimed:
-                rec["state"] = claimed
-                rec["closed_by"] = on_disk.get("closed_by", "other")
-        save_record(rec)
+    """Close a run. The first ending on disk stands: see `save_record`."""
+    save_record(rec)
     return rec
 
 
@@ -306,19 +324,19 @@ def save_heartbeat(rec):
     Same hazard as `save_final_record`, at the other end of a run's life: a
     heartbeat is the one write that carries nothing but its own timestamp, so
     writing the whole record back would undo whatever another process journaled
-    while this one was polling, and a run killed mid-poll would come back
-    running. It takes no lock, because a poll can be running inside the
-    check-and-reserve that holds the runs lock already.
+    while this one was polling. Read and written under the runs lock, which is
+    reentrant, so a poll inside a check-and-reserve takes it again.
     """
     stamp = utc_now()
     rec["heartbeat"] = stamp
     path = Path(rec["dir"]) / "run.json"
-    try:
-        on_disk = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        on_disk = dict(rec)
-    on_disk["heartbeat"] = stamp
-    save_record(on_disk)
+    with runs_lock():
+        try:
+            on_disk = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            on_disk = dict(rec)
+        on_disk["heartbeat"] = stamp
+        save_record(on_disk)
     return stamp
 
 
