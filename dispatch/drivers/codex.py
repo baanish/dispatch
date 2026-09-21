@@ -73,6 +73,19 @@ def rollout_mentions(path, markers, max_lines=ROLLOUT_SCAN_LINES):
 NET = {True: "true", False: "false"}
 
 
+def model_args(lane):
+    """Model, effort, and the service tier when the lane names one.
+
+    `tier` is optional in a lane, and an empty `service_tier=` is not "no tier"
+    to codex: it is a value codex refuses, in an error that never mentions
+    dispatch.
+    """
+    argv = ["-m", lane.model, "-c", f"model_reasoning_effort={lane.effort}"]
+    if lane.tier:
+        argv += ["-c", f"service_tier={lane.tier}"]
+    return argv
+
+
 class CodexDriver(Driver):
     name = "codex"
     agent_kind = "codex"
@@ -97,12 +110,7 @@ class CodexDriver(Driver):
     login_probe = ("codex", "login", "status")
 
     def launch_argv(self, lane, opts, session_id=""):
-        argv = [
-            "codex",
-            "-m", lane.model,
-            "-c", f"model_reasoning_effort={lane.effort}",
-            "-c", f"service_tier={lane.tier}",
-        ]
+        argv = ["codex", *model_args(lane)]
         # No trust-level override. It parses, and it does not work: codex still
         # opens its directory-trust dialog with the key set. The dialog is
         # answered where it appears instead, and an inert flag on every command
@@ -132,9 +140,7 @@ class CodexDriver(Driver):
         # never captured resumes by `--last`, which is cwd-filtered by default.
         session_id = validate_session_id(session_id) if session_id else ""
         argv = ["codex", "resume"] + ([session_id] if session_id else ["--last"])
-        argv += ["-m", lane.model,
-                 "-c", f"model_reasoning_effort={lane.effort}",
-                 "-c", f"service_tier={lane.tier}"]
+        argv += model_args(lane)
         argv += ["-a", "on-request",
                  "-c", "approvals_reviewer=guardian_subagent"]
         if opts.write:
@@ -154,10 +160,7 @@ class CodexDriver(Driver):
         if resume_session:
             return self.headless_resume_argv(lane, opts, prompt_text, out_path,
                                              resume_session)
-        argv = ["codex", "exec", "--skip-git-repo-check",
-                "-m", lane.model,
-                "-c", f"model_reasoning_effort={lane.effort}",
-                "-c", f"service_tier={lane.tier}"]
+        argv = ["codex", "exec", "--skip-git-repo-check", *model_args(lane)]
         if opts.write:
             # `-a` belongs to the interactive binary; `codex exec` exits 2 on it.
             argv += ["-c", "approval_policy=on-request",
@@ -189,10 +192,7 @@ class CodexDriver(Driver):
         """
         sandbox = "workspace-write" if opts.write else "read-only"
         argv = ["codex", "exec", "resume", "--skip-git-repo-check",
-                "-m", lane.model,
-                "-c", f"model_reasoning_effort={lane.effort}",
-                "-c", f"service_tier={lane.tier}",
-                "-c", f"sandbox_mode={sandbox}"]
+                *model_args(lane), "-c", f"sandbox_mode={sandbox}"]
         if opts.write:
             # `-a` belongs to the interactive binary; `codex exec` exits 2 on it.
             argv += ["-c", "approval_policy=on-request",

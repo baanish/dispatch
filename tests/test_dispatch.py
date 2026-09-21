@@ -18,6 +18,7 @@ import sys
 import threading
 import time
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
@@ -137,6 +138,16 @@ class TestLanes(HerdrStubTestCase):
                     lane, opts, "p", resume_session=session)):
             self.assertNotIn("-a", argv)
             self.assertEqual(argv[argv.index("approval_policy=on-request") - 1], "-c")
+
+    def test_a_codex_lane_with_no_tier_sends_no_tier(self):
+        """`tier` is optional, and an empty `service_tier=` is a value codex
+        rejects rather than the absence of one."""
+        lane = replace(lanes.resolve_lane("sol@medium"), tier="")
+        opts = records.RunOptions(dir="/w", write=True)
+        driver = drivers.get_driver("codex")
+        for argv in (driver.launch_argv(lane, opts),
+                     driver.headless_argv(lane, opts, "p")):
+            self.assertFalse([a for a in argv if a.startswith("service_tier")])
 
     def test_sol_read_only_argv_matches_known_good(self):
         lane = lanes.resolve_lane("sol@medium")
