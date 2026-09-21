@@ -4852,6 +4852,19 @@ class TestSelfUpdateRespawn(HerdrStubTestCase):
     def status_log(self, rec):
         return (Path(rec["dir"]) / "status.log").read_text(encoding="utf-8")
 
+    def test_a_banner_phrase_in_a_working_workers_output_is_not_an_update(self):
+        """"Installed successfully" from a package manager, on the screen of a
+        worker that then exits with no answer, used to relaunch the run and
+        deliver the whole brief a second time."""
+        rec = self.make_live_record()
+        wrapper = runner.RunWrapper(herdr.HerdrSubstrate(), rec)
+        wrapper.attach()
+        wrapper.substrate = type("S", (), {
+            "screen_since_spawn": lambda *a: "Update ran successfully! restart"})()
+        self.assertTrue(wrapper.update_exit_marker())
+        wrapper._worked_since_prompt = True
+        self.assertEqual(wrapper.update_exit_marker(), "")
+
     def test_a_codex_update_exit_is_respawned_and_the_run_completes(self):
         self.stub.update_exits = 1
         self.stub.update_banner = CODEX_UPDATE_SCREEN

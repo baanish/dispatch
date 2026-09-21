@@ -26,8 +26,9 @@ class GrokDriver(Driver):
     turn_signal = "agent-done"
     # No recorded occurrence of grok exiting for an update, so these come from
     # its own updater's strings rather than from a pane that ate a run.
-    update_markers = ("updating grok", "installed successfully!",
-                      "please restart grok")
+    # Phrases that name grok, never a bare "installed successfully!": a package
+    # manager prints that too, and a match relaunches the run.
+    update_markers = ("updating grok", "please restart grok")
     metered_key_vars = ("XAI_API_KEY", "GROK_API_KEY")
     cli_binary = "grok"
     # Deliberately none, for the same reason as claude: the CLI exposes no
