@@ -833,9 +833,10 @@ class TestPaneSpawn(HerdrStubTestCase):
         self.assertEqual(self.stub.workspaces[0]["env"]["OPENAI_API_KEY"], "")
         self.run_cli("run", "opus@high", str(self.brief))
         env = self.stub.workspaces[1]["env"]
-        for var in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN",
-                    "CLAUDE_CODE_OAUTH_TOKEN"):
+        for var in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"):
             self.assertEqual(env[var], "")
+        # A subscription's own token, so blanking it would log the lane out.
+        self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", env)
 
 
 class TestCompletion(HerdrStubTestCase):

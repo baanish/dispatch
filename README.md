@@ -39,8 +39,8 @@ dispatch board                          # the five slots, and the lane filling e
 
 Every preset also picks a model for each of its lanes, and your account has to
 be entitled to those models. `dispatch doctor` answers a narrower question:
-whether each lane's CLI is on `PATH`, and for codex whether its login probe
-passes (claude and grok have no free probe, so an installed binary reads as
+whether each lane's CLI is on `PATH`, and for codex and claude whether its
+login probe passes (grok has no free probe, so an installed binary reads as
 ok). It does not
 ask a vendor which models the account behind that login may run. A lane naming a
 model you do not have is an edit to its `model` in the config, below.

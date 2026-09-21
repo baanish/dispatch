@@ -593,13 +593,21 @@ class TestDoctor(ConfigTestCase):
 
     def test_a_driver_with_no_probe_says_only_that_it_is_installed(self):
         """Reporting less than was checked beats a green line that means less."""
-        self.fake("claude")
-        self.write_user_config('[lanes.big]\ndriver = "claude"\nmodel = "m"\n'
+        self.fake("grok")
+        self.write_user_config('[lanes.big]\ndriver = "grok"\nmodel = "m"\n'
                                'efforts = ["high"]\n')
         report, ok = doctor.render_report(config.load_config(), substrate="herdr")
         self.assertTrue(ok)
         self.assertIn("no login probe", report)
         self.assertNotIn("logged in", report)
+
+    def test_claude_is_asked_whether_it_is_logged_in(self):
+        self.fake("claude", exit_code=1, output="Not logged in")
+        self.write_user_config('[lanes.big]\ndriver = "claude"\nmodel = "m"\n'
+                               'efforts = ["high"]\n')
+        report, ok = doctor.render_report(config.load_config(), substrate="herdr")
+        self.assertFalse(ok)
+        self.assertIn("claude auth status --text", report)
 
     def test_login_uses_the_resolved_executable_including_windows_extension(self):
         driver = doctor.get_driver("codex")

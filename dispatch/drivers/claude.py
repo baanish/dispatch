@@ -51,12 +51,14 @@ class ClaudeDriver(Driver):
         trust_keys=("enter",),
         trust_accept="yes, i trust this folder",
         trust_attempts=2)
-    metered_key_vars = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN",
-                        "CLAUDE_CODE_OAUTH_TOKEN")
+    # Not `CLAUDE_CODE_OAUTH_TOKEN`: `claude setup-token` issues it for a
+    # subscription, so it is the login of a machine with no keychain, and blanking
+    # it logs a subscription lane out instead of keeping it on its subscription.
+    metered_key_vars = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")
     cli_binary = "claude"
-    # Deliberately none: every form that reports auth state either opens the TUI
-    # or spends a turn, and doctor may do neither.
-    login_probe = ()
+    # Prints the login and exits 1 when there is none, without opening the TUI
+    # or spending a turn.
+    login_probe = ("claude", "auth", "status", "--text")
 
     def launch_argv(self, lane, opts, session_id=""):
         argv = [
