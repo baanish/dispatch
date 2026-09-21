@@ -100,7 +100,10 @@ default, which may not be the slot you meant.
 | `--image PATH` | Attach an image. codex lanes only. |
 
 Drivers do not offer the same permissions. Only a codex lane runs in an OS
-sandbox (`read-only`, or `workspace-write` under `--write`). A claude lane is
+sandbox (`read-only`, or `workspace-write` under `--write`), and that sandbox
+confines writes and network, never reads: every worker can read what the
+operator's account can. The vendor CLI also loads whatever project config the
+task directory carries. A claude lane is
 Claude Code's auto permission mode, with only `Read`, `Grep`, and `Glob`
 pre-approved when `--write` is off, and a grok lane is auto permission mode
 with nothing blocking a write: on both, read-only is an instruction the brief

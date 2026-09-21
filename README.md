@@ -123,18 +123,28 @@ rules. Grok ignores it. `continue` does not forward extra directories.
 | claude | Not a sandbox. `--permission-mode auto` with `Read`, `Grep`, and `Glob` pre-approved; every other tool call, shell commands and edits included, is decided by Claude Code's auto mode and your own Claude settings. | `--permission-mode auto` with nothing pre-approved. Nothing confines writes to `--dir`. |
 | grok | Not a sandbox. `--permission-mode auto`, subagents off, 12 turns. Nothing blocks a write. | Refused. |
 
-Only a codex lane is confined by the operating system. On claude and grok lanes,
-leaving `--write` off states intent and sets permissions, and a worker that
-misbehaves can still cross it. A brief you do not trust belongs on a codex lane,
-or in a container or VM of your own.
+Only a codex lane is confined by the operating system, and what that confines
+is writes and network, not reads: a codex worker can read anything your account
+can, your ssh keys and other runs' answers included, and what it reads can come
+back in its answer. On claude and grok lanes, leaving `--write` off states
+intent and sets permissions, and a worker that misbehaves can still cross it. A
+brief you do not trust belongs in a container or VM of your own; a codex lane
+only keeps it from writing outside `--dir`.
+
+The vendor CLI is the vendor's. dispatch reads no config from the task
+directory, but the CLI it starts there does: Claude Code loads that checkout's
+`.claude/settings.json`, hooks, and MCP servers, and codex its project config,
+with whatever they allow. dispatch also answers the CLI's first-visit "do you
+trust this folder" dialog for you, because you chose the directory with `--dir`,
+and the CLI remembers that answer for the directory afterwards. Look at a
+checkout you did not write before you dispatch onto it.
 
 ### What dispatch is not
 
 dispatch is a launcher that runs as you, not a boundary between you and a
 worker. Caps, the depth limit, and `DISPATCH_HOME` are bookkeeping that a
 cooperative worker respects and a hostile one can step around. Every worker runs
-under your account, so one that is not confined by codex's sandbox can read what
-you can read, your ssh keys and other runs' answers included. A worker's run
+under your account and can read what you can read, on every lane. A worker's run
 directory under `~/.dispatch/runs/` holds its answer next to dispatch's own
 records; dispatch never writes through a symlink there or at `--out`, and reads
 nothing from the task directory, but a worker that can write in its run
