@@ -263,11 +263,14 @@ is shared with tmux.
 
 ### The tmux substrate
 
-A run is one detached tmux session, `dispatch-<run id>`, holding one window with
-one pane. dispatch never attaches the operator to it: `dispatch watch` reads the
-pane, and `tmux attach -t dispatch-<run id>` is the line for looking at one by
-hand, which is what `attach_hint` returns and what `dispatch inspect` prints
-where it has no terminal to hand over.
+A run is one detached tmux session, `dispatch-` and the run id sanitized into a
+name tmux accepts, hashed when it will not fit whole, holding one window with
+one pane. Nothing attaches the operator on its own: `dispatch watch` reads the
+pane, and `dispatch watch <id> --attach` is the line for looking at one by hand,
+because it names the session dispatch recorded rather than a session name
+guessed from the run id. `attach_hint` returns the `tmux attach -t` command for
+that recorded name, and `dispatch inspect` prints it where it has no terminal to
+hand over.
 
 It is detected by asking two questions rather than one, both in the constructor:
 is there a tmux on PATH, and will it give us a server. `tmux start-server` is the

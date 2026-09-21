@@ -12,10 +12,10 @@ the first launch.
 - The brief is a file: `dispatch run <lane> brief.md --dir <repo> [--write]
   [--bg]`. Name the paths, the file ownership, the authorized side effects, the
   deliverable, and what done means, or the worker decides those for you.
-- The worker's answer is `out.md` in its run directory and nothing else is
-  captured. A foreground run prints it; `--bg` prints the run id, and
-  `dispatch wait <id>` blocks for it. Pair every background launch with a
-  waiter, and read the answer before integrating it.
+- The worker's answer is `out.md` in its run directory, and nothing it leaves on
+  screen is read as one. A foreground run prints it; `--bg` prints the run id
+  and then the run directory, and `dispatch wait <id>` blocks for it. Pair every
+  background launch with a waiter, and read the answer before integrating it.
 - `dispatch status` lists runs. Correct a live worker with `dispatch steer <id>
   <message>`, ask a finished one for more with `dispatch continue <id>
   <message>`, and stop one with `dispatch kill <id>`.

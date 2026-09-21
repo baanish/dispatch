@@ -103,8 +103,9 @@ There is no short form.
 | `dispatch board`, `dispatch lanes`, `dispatch doctor` | The board, the lane table, the health check. |
 | `dispatch init`, `dispatch skill [--install]`, `dispatch agents-snippet` | The config, and the two agent-facing documents. |
 
-`run` takes `--dir PATH` (sandbox root, default the current directory),
-`--write` (a workspace-write sandbox, read-only otherwise), `--net` (network
+`run` takes `--dir PATH` (the working directory, and codex's sandbox root;
+default the current directory), `--write` (writing allowed under the selected
+driver's own permissions, read-only otherwise), `--net` (network
 inside a codex write sandbox), `--add-dir PATH` (extra writable tree for codex
 lanes with `--write`, repeatable), `--schema PATH` (JSON output shaped by this
 schema; dispatch checks that it parses, and only a headless codex run has the
@@ -351,9 +352,11 @@ error names the key and the file.
 default, one vendor per role), `openai-only`, `anthropic-only`, and `all-genius`
 (one lane in every slot).
 
-Three environment variables: `DISPATCH_CONFIG` points at another user file,
-`DISPATCH_HOME` relocates `~/.dispatch`, and `AGENT_DEPTH` is the ladder marker
-a spawned worker inherits.
+Environment overrides: `DISPATCH_CONFIG` points at another user file,
+`DISPATCH_HOME` relocates `~/.dispatch`, `DISPATCH_SUBSTRATE` pins the substrate
+ahead of `[general] substrate`, `DISPATCH_SESSION` names the session the
+per-session cap counts a run against, in place of the OS session it would be
+derived from, and `AGENT_DEPTH` is the ladder marker a spawned worker inherits.
 
 ### Policy defaults
 
@@ -383,7 +386,7 @@ unreadable marker is refused rather than guessed at.
 
 | Code | Meaning |
 | --- | --- |
-| 0 | The run finished and wrote its deliverable. |
+| 0 | The command did what was asked. For a foreground `run` or `continue`, and for a `wait` that saw the run end, that is a run that finished and wrote its deliverable. `run --bg` returns it for a worker that started, and `status`, `board`, and the other reads for a question answered. |
 | 1 | The run failed, or `doctor` found something broken. |
 | 2 | dispatch refused or could not proceed: a usage error, a bad config file, an unknown lane, a cap refusal, a missing run, or a worker that would not start. |
 | 3 | The worker refused the brief: its answer starts with `ABORT:`. |
@@ -399,7 +402,7 @@ One run is one directory under `~/.dispatch/runs/<run id>/`:
 | `brief.md` | The brief, as it was passed. |
 | `cmd.txt` | The argv the vendor CLI was launched with, quoted for a shell. |
 | `prompt.txt` | What dispatch typed into the worker: the preamble, the brief's path, and where to write the answer. |
-| `out.md` | The worker's answer, and the only thing captured. Anything left on a screen is lost. |
+| `out.md` | The worker's answer, the one file read back as the result. After a run that ended without one, dispatch leaves its copy of the last screen here instead. |
 | `out.json` | The deliverable of a `--schema` run, mirrored into `out.md`. |
 | `status.log` | The run's timeline: state changes, check-in verdicts, and what dispatch did when. |
 | `screen.log` | What was on the worker's screen, as far back as the substrate keeps it. |

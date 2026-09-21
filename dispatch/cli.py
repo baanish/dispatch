@@ -1608,17 +1608,20 @@ def build_parser():
     run = subs.add_parser("run",
                           help=f"single spawn; lane defaults to {default_lane()}")
     run.add_argument("positional", nargs="*", metavar="[lane] brief")
-    run.add_argument("--dir", help="sandbox root (default: cwd)")
-    run.add_argument("--write", action="store_true", help="workspace-write sandbox")
+    run.add_argument("--dir",
+                     help="working directory, and codex's sandbox root (default: cwd)")
+    run.add_argument("--write", action="store_true",
+                     help="allow writing, under the driver's own permissions")
     run.add_argument("--net", action="store_true",
-                     help="network inside the write sandbox")
+                     help="network inside a codex write sandbox")
     run.add_argument("--add-dir", action="append",
                      help="extra writable tree (codex lanes, with --write), repeatable; "
                           "claude: additional tool directory; grok: ignored")
     run.add_argument("--schema", help="JSON output for this schema file; dispatch checks it parses, "
                           "not that it conforms")
     run.add_argument("--out", help="copy the final message here too")
-    run.add_argument("--bg", action="store_true", help="background; prints the run id")
+    run.add_argument("--bg", action="store_true",
+                     help="background; prints the run id, then the run directory")
     run.add_argument("--deadline",
                      help=f"check-in interval (default {policy().default_deadline})")
     run.add_argument("--image", help="attach an image (codex -i)")

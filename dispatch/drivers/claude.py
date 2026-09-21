@@ -116,7 +116,8 @@ class ClaudeDriver(Driver):
     def validate_options(self, lane, opts):
         if opts.net:
             raise DispatchError(
-                "--net is codex-only; claude lanes use Claude Code's own sandbox")
+                "--net is codex-only; dispatch configures no network sandbox "
+                "for claude lanes")
         if opts.image:
             raise DispatchError("--image is codex-only (codex `-i`)")
 

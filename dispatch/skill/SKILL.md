@@ -72,9 +72,10 @@ Leave out conversation dumps, text it can read at a path, and setup that belongs
 in the invocation. Split build, verification, and release when they need
 different permissions.
 
-dispatch itself tells the worker where to write the answer. Only `out.md` in the
-run directory is captured (`out.json` under `--schema`); a message left on
-screen is lost. A worker that hits its stop condition writes `ABORT:` and the
+dispatch itself tells the worker where to write the answer. `out.md` in the run
+directory is the result (`out.json` under `--schema`); a message left on screen
+is not read as one, though the run keeps the worker CLI's own output beside it.
+A worker that hits its stop condition writes `ABORT:` and the
 question there instead, which is terminal and is never retried.
 
 ## Launch
@@ -88,12 +89,12 @@ default, which may not be the slot you meant.
 
 | Flag | What it does |
 | --- | --- |
-| `--dir PATH` | The working directory and sandbox root. Defaults to the current directory. |
-| `--write` | A workspace-write sandbox. Read-only otherwise. |
+| `--dir PATH` | The working directory, and codex's sandbox root. Defaults to the current directory. |
+| `--write` | Writing allowed, under the selected driver's own permissions. Read-only otherwise. |
 | `--net` | Network inside a codex write sandbox. Needs `--write`, and claude and grok lanes refuse it. |
 | `--add-dir PATH` | Extra writable tree on codex lanes with `--write`, repeatable. Claude adds a tool directory under its permission rules. Grok ignores it. `continue` does not forward extra directories. |
 | `--on NAME` | Place the run on a configured machine, ahead of any machine the lane names. |
-| `--bg` | Return once the worker is under way, printing the run id. |
+| `--bg` | Return once the worker is under way, printing the run id on the first line and the run directory on the second. |
 | `--deadline 20m` | The check-in interval. Defaults to the configured one, `30m` out of the box. |
 | `--schema PATH` | Ask for JSON output shaped by this schema file. dispatch checks that the answer parses as JSON, not that it conforms; only a headless codex run has the schema enforced, by codex itself. |
 | `--out PATH` | Copy the answer here as well. The parent directory must exist. |
