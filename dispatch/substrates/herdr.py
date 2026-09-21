@@ -41,7 +41,8 @@ from ..records import append_status, utc_now
 from .base import (Substrate, SubstrateCapabilities, SubstrateError, SpawnResult,
                    Worker, WorkerProcess, WorkerSetupError, WorkerStatus)
 from .paneshell import (ENV_MARKER, PANE_SHELL, RC_MARKER, anchor_after,
-                        parse_env_echo, parse_rc_echo, rc_token)
+                        parse_env_echo, parse_rc_echo, rc_probe_token,
+                        rc_token)
 
 # Pinned: protocol drift is a loud refusal, never a guess. Both entries have
 # been verified live, call by call (workspace.create, pane.split,
@@ -1212,7 +1213,7 @@ class HerdrSubstrate(Substrate):
         typed line cannot be mistaken for the answer because it still reads
         `=$...` where the answer reads `=<n>`.
         """
-        token = rc_token(run_id or worker.id)
+        token = rc_probe_token(run_id or worker.id)
         probe = PANE_SHELL.rc_probe_line(RC_MARKER, token)
         if log_path is not None:
             append_status(log_path, f"RC-PROBE {utc_now()} reading the status at the prompt")
