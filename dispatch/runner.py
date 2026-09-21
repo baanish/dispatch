@@ -2554,8 +2554,13 @@ def spawn_detached_watcher(rec):
         [root] + ([env["PYTHONPATH"]] if env.get("PYTHONPATH") else []))
     log = open_append(directory / "watcher.log")
     try:
+        # A shell-mode run's `cwd` is a path on its machine. The watcher runs
+        # here, and started in a directory that exists only over there it never
+        # started: the launch failed after the remote worker had its brief, and
+        # abandoning the run interrupted it.
         popen = popen_detached(
-            argv, cwd=rec.get("cwd") or None, env=env,
+            argv, cwd=None if rec.get("remote_staging") else rec.get("cwd") or None,
+            env=env,
             stdin=subprocess.DEVNULL, stdout=log, stderr=log)
     except OSError as exc:
         # Operator-facing: the run cannot be left in a home with nothing to close

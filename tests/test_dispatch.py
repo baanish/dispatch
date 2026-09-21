@@ -1229,6 +1229,21 @@ class TestBackground(HerdrStubTestCase):
         self.assertIn(("workspace", rec["worker_group"]), self.stub.closed)
         self.assertEqual((Path(rec["dir"]) / "out.md").read_text(), "final message")
 
+    def test_a_shell_mode_watcher_does_not_start_in_the_machines_directory(self):
+        """`--dir` names a path on the other machine, which need not exist here."""
+        rec = self.make_live_record()
+        rec.update(cwd="/srv/only/over/there", remote_staging="~/.dispatch/remote/x")
+        seen = {}
+
+        def capture(argv, cwd=None, **kwargs):
+            seen["cwd"] = cwd
+            raise OSError("stop here")
+
+        with patch.object(runner, "popen_detached", side_effect=capture):
+            with self.assertRaises(errors.DispatchError):
+                runner.spawn_detached_watcher(rec)
+        self.assertIsNone(seen["cwd"])
+
     def test_a_watcher_that_cannot_be_spawned_fails_the_run_loudly(self):
         """A live pane with nobody to close it should not wait for a sweep."""
         original = runner.spawn_detached_watcher
