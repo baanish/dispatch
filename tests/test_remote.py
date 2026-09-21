@@ -170,12 +170,29 @@ class TestRemoteLaunch(FakeSshTestCase):
         self.assertIn("is not reachable", message)
         self.assertIn(f"ssh {self.machine_ssh} exit 0", message)
 
+    def test_a_reservation_whose_launcher_died_does_not_hold_its_slot_forever(self):
+        """No run was ever reported by the machine, so there is nothing to poll
+        and the record has to be settled here."""
+        rec = remote.prepare_remote_run(
+            remote.machine_for(self.machine_name),
+            lanes.resolve_lane("astra@medium"), "brief",
+            records.RunOptions(dir="/srv/project", bg=True))
+        rec["reserved_at"] = 0
+        records.save_record(rec)
+        live = caps.live_records(runner.SubstrateSweep(None))
+        self.assertNotIn(rec["id"], [found["id"] for found in live])
+        self.assertEqual(records.load_record(rec["id"])["state"], "orphaned")
+
     def test_a_launch_that_reports_no_run_id_fails_the_run(self):
         self.set_replies([["dispatch run", {"stdout": "\n"}]])
         message = self.main_fails(["run", "astra@medium", str(self.brief), "--bg",
                                    "--on", self.machine_name])
         self.assertIn("did not report a run id", message)
-        self.assertEqual(records.all_records()[0]["state"], "failed")
+        rec = records.all_records()[0]
+        self.assertEqual(rec["state"], "failed")
+        # The reason survives, and it does not claim nothing runs over there.
+        self.assertIn("did not report a run id", rec["error"])
+        self.assertIn("may be running there", rec["error"])
 
     def test_a_foreground_run_waits_for_the_machine_and_prints_what_it_wrote(self):
         run_id, remote_dir = self.launched()

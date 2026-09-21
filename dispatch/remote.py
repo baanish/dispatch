@@ -538,23 +538,32 @@ def run_remote(machine, lane, brief_text, opts, brief_path):
         lambda: prepare_remote_run(machine, lane, brief_text, opts))
     try:
         rec = launch_remote_run(rec, machine, brief_path)
-    except BaseException:
-        close_failed_launch(rec, handle)
+    except BaseException as exc:
+        close_failed_launch(rec, handle, exc)
         raise
     release_run_lock(handle)
     return rec if opts.bg else wait_for_remote(rec, machine)
 
 
-def close_failed_launch(rec, handle):
-    """Close a reservation whose launch never happened.
+def close_failed_launch(rec, handle, exc):
+    """Close a reservation whose launch failed, and say why.
 
-    Nothing was started anywhere, so the slot is a slot with nothing in it and
-    the record says so rather than being left `reserved` for a sweep to guess at.
+    The record is closed rather than left `reserved` for a sweep to guess at.
+    Whether anything started over there is not always known: a connection that
+    drops after the command went out fails the same way as one that never got
+    through, so the error says to look on the machine rather than claiming
+    nothing runs there.
     """
     rec["state"] = "failed"
+    rec["error"] = (f"launch on {rec.get('machine') or 'the machine'} failed: "
+                    f"{type(exc).__name__}: {exc}. If the command had already "
+                    "gone out, a worker may be running there: `dispatch status` "
+                    "on that machine shows it")
     rec["finished"] = utc_now()
     rec["closed_by"] = "launch"
     save_record(rec)
+    append_status(Path(rec["dir"]) / "status.log",
+                  f"LAUNCH-FAILED {utc_now()} {type(exc).__name__}: {exc}")
     release_run_lock(handle)
 
 
@@ -735,8 +744,8 @@ def continue_remote(rec, lane, message, opts):
         if opts.deadline:
             argv += ["--deadline", opts.deadline]
         child = start_on_machine(child, machine, argv)
-    except BaseException:
-        close_failed_launch(child, handle)
+    except BaseException as exc:
+        close_failed_launch(child, handle, exc)
         raise
     release_run_lock(handle)
     return child if opts.bg else wait_for_remote(child, machine)

@@ -187,6 +187,19 @@ def split_lane_and_brief(positional):
 # --------------------------------------------------------------------------
 
 
+def stage_or_fail(rec, substrate):
+    """Send a shell-mode run's files up, failing the run if they will not go.
+
+    Staging happens before any worker exists, so nothing else would record the
+    failure: the run would sit `reserved` with the reason lost.
+    """
+    try:
+        remote.stage_shell_run(rec)
+    except BaseException as exc:
+        RunWrapper(substrate, rec).abandon(exc)
+        raise
+
+
 def cmd_run(args):
     lane_text, brief = split_lane_and_brief(args.positional)
     lane = resolve_lane(lane_text)
@@ -236,7 +249,7 @@ def cmd_run(args):
             # The pane is on a box with a filesystem of its own, so the brief and
             # the prompt go up before anything is started: the run's own record
             # already names them by their paths there.
-            remote.stage_shell_run(rec)
+            stage_or_fail(rec, substrate)
         if opts.bg:
             # No detached supervisor: the worker's home is the background
             # process, and its deadline and exit code are settled by the next
@@ -317,7 +330,11 @@ def cmd_continue(args):
                             machine=machine),
         sweep=SubstrateSweep(substrate, machine=machine.name if machine else ""))
     if machine is not None:
-        remote.stage_shell_run(child)
+        try:
+            stage_or_fail(child, substrate)
+        except BaseException:
+            release_run_lock(handle)
+            raise
     if inspected is not None:
         # The substrate knows that home's agent by the name inspect registered,
         # which is the parent's. The child adopts the session, so it adopts the

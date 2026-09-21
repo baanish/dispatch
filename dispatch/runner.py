@@ -893,13 +893,15 @@ class RunWrapper:
         the substrate, and exactly why an aborted launch has to clean up after
         itself: nothing else knows it exists yet.
         """
-        if self.worker is None:
-            return self.rec
-        # The screen first, always. A run abandoned before it delivered its brief
-        # is exactly the one whose screen nobody will ever see again.
-        with contextlib.suppress(Exception):
-            replace_text(self.dir / "screen.log",
-                         self.substrate.read_screen(self.worker))
+        # With no worker yet there is no home to clean up, and the record still
+        # has to say the launch failed: left `reserved`, it holds a slot until a
+        # sweep guesses at it, and the reason is gone by then.
+        if self.worker is not None:
+            # The screen first, always. A run abandoned before it delivered its
+            # brief is exactly the one whose screen nobody will ever see again.
+            with contextlib.suppress(Exception):
+                replace_text(self.dir / "screen.log",
+                             self.substrate.read_screen(self.worker))
         append_status(self.status_path,
                       f"ABANDONED {utc_now()} {type(exc).__name__}: {exc}")
         self.rec["state"] = "failed"

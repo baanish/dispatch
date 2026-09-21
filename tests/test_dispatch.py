@@ -630,6 +630,21 @@ class TestPaneSpawn(HerdrStubTestCase):
         self.assertIn(rec["state"], policy.policy().terminal_states)
         self.assertIn(("workspace", rec["worker_group"]), self.stub.closed)
 
+    def test_a_launch_that_fails_before_any_worker_exists_is_still_recorded(self):
+        """No home to clean up, but a record left `reserved` holds a slot and
+        loses the reason."""
+        rec = self.make_live_record()
+        rec.update(state="reserved", worker_id="")
+        records.save_record(rec)
+        wrapper = runner.RunWrapper.__new__(runner.RunWrapper)
+        wrapper.rec, wrapper.worker = rec, None
+        wrapper.dir = Path(rec["dir"])
+        wrapper.status_path = wrapper.dir / "status.log"
+        wrapper.abandon(errors.DispatchError("the brief would not copy up"))
+        settled = records.load_record(rec["id"])
+        self.assertEqual(settled["state"], "failed")
+        self.assertIn("would not copy up", settled["error"])
+
     def test_the_fallback_prompt_never_types_the_prompt_body(self):
         """Those keystrokes may be going into a shell, where a newline is a
         command and a schema body is a command line full of substitutions."""
