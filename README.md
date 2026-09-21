@@ -58,13 +58,16 @@ and its path is what `dispatch run` takes.
 
 ```
 cat > brief.md <<'EOF'
-Move the retry helper in src/net/retry.py onto the timeout policy in
-src/net/policy.py, keeping the public signature. Run `pytest tests/net -q`
-before claiming it is done. Report what changed and why.
+List the top-level files in this directory and say what this project appears
+to be, in a short paragraph. Read only: change no file and run no command that
+writes.
 EOF
 
-dispatch run brief.md --dir . --write
+dispatch run brief.md --dir .
 ```
+
+That brief only reads, so the run needs no `--write`; a task that has to change
+files takes it.
 
 `dispatch run` with no lane takes the default lane, which is the `medium` slot
 unless your config names another. A config that leaves `medium` empty falls back
@@ -76,12 +79,12 @@ wrote. `--bg` returns instead, printing the run id on its first line and the run
 directory on its second:
 
 ```
-dispatch run brief.md --dir . --write --bg
-# astra@medium-183640-1ed5
-# ~/.dispatch/runs/astra@medium-183640-1ed5
+run_id=$(dispatch run brief.md --dir . --bg | head -1)
+# run_id is now astra@medium-183640-1ed5, and the second line `head` dropped
+# was ~/.dispatch/runs/astra@medium-183640-1ed5
 
-dispatch status                                # one line per run
-dispatch wait astra@medium-183640-1ed5         # block, then print the answer
+dispatch status          # one line per run
+dispatch wait "$run_id"  # block, then print the answer
 ```
 
 Every verb that takes an id takes the whole id, the first line `--bg` printed.
