@@ -3657,10 +3657,10 @@ class TestHandBackDialog(HerdrStubTestCase):
     def test_status_and_the_wall_say_the_run_is_waiting_on_his_hand(self):
         rec = self.blocked_bg_run()
         _, status = self.capture_stdout("status")
-        self.assertIn(f"NEEDS HAND: {drivers.get_driver("claude").dialog_rules.handback_rules[0]}", status)
+        self.assertIn(f"NEEDS HAND: {drivers.get_driver('claude').dialog_rules.handback_rules[0]}", status)
         self.assertIn(rec["worker_id"], status)
         _, wall = self.capture_stdout("watch")
-        self.assertIn(f"NEEDS HAND {drivers.get_driver("claude").dialog_rules.handback_rules[0]}", wall)
+        self.assertIn(f"NEEDS HAND {drivers.get_driver('claude').dialog_rules.handback_rules[0]}", wall)
 
     # -- the one exemption: the trust dialog dispatch answers itself ------
 
