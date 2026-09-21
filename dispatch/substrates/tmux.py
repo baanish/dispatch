@@ -49,9 +49,14 @@ from ..processes import KILL_GRACE_SECONDS, descendant_pids, process_cpu_percent
 from ..records import append_status, utc_now
 from .base import (Substrate, SubstrateCapabilities, SubstrateError, SpawnResult,
                    Worker, WorkerProcess, WorkerSetupError)
-from .paneshell import (ENV_MARKER, PANE_SHELL, RC_MARKER, anchor_after,
+from .paneshell import (ENV_MARKER, RC_MARKER, PosixPaneShell, anchor_after,
                         parse_env_echo, parse_rc_echo, rc_probe_token,
                         rc_token)
+
+# A tmux pane's shell is POSIX wherever dispatch itself runs. tmux does not
+# exist on Windows, so the only tmux a Windows controller drives is another
+# machine's, and the controller's own PowerShell dialect would be typed into it.
+PANE_SHELL = PosixPaneShell()
 
 SESSION_PREFIX = "dispatch-"
 # tmux takes longer names, but a session name is typed by hand in the attach
