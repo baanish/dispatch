@@ -342,7 +342,20 @@ def cmd_continue(args):
         # name: asking about a name that was never registered gets "not found"
         # for every probe, and the turn would never be seen to end.
         child["agent"] = run_agent_name(rec, substrate)
+        # The claim goes on the record before the turn starts. Two `continue`s
+        # read the same parent pointer, and without it both adopted the one
+        # home: two prompts typed into it, and one run closing it under the
+        # other. The older claim wins and the newer run ends here.
+        child["adopts_worker"] = inspected.id
         save_record(child)
+        first = inspect_home_claimants(inspected.id)[0]
+        if first["id"] != child["id"]:
+            error = DispatchError(
+                f"{first['id']} is already running a turn in {args.id}'s inspect "
+                f"home; `dispatch steer {first['id']}` corrects it, or wait for it")
+            RunWrapper(substrate, child).abandon(error)
+            release_run_lock(handle)
+            raise error
     try:
         if bg:
             child = start_run_background(child, substrate, attach_worker=inspected)
@@ -1278,13 +1291,20 @@ def inspect_worker_adopted(rec):
     worker_id = rec.get("inspect_worker")
     if not worker_id:
         return False
-    for other in all_records():
-        if other.get("id") == rec.get("id"):
-            continue
-        if other.get("worker_id") == worker_id \
-                and other.get("state") not in policy().terminal_states:
-            return True
-    return False
+    return bool(inspect_home_claimants(worker_id, rec.get("id")))
+
+
+def inspect_home_claimants(worker_id, but_not=""):
+    """Live runs driving, or about to drive, this inspect home, oldest first.
+
+    `adopts_worker` is the claim a `continue` writes the moment it has its own
+    record, before the turn starts and `worker_id` says the same thing.
+    """
+    found = [other for other in all_records()
+             if other.get("id") != but_not
+             and worker_id in (other.get("worker_id"), other.get("adopts_worker"))
+             and other.get("state") not in policy().terminal_states]
+    return sorted(found, key=lambda r: (r.get("reserved_at") or 0, r.get("id", "")))
 
 
 def inspect_fingerprint(rec, worker, substrate):
@@ -1387,6 +1407,11 @@ def close_inspect_worker(rec, substrate):
     if not worker_id:
         print(f"{rec['id']} has no inspect home open")
         return EXIT_OK
+    claimants = inspect_home_claimants(worker_id, rec["id"])
+    if claimants:
+        raise DispatchError(
+            f"{claimants[0]['id']} is running a turn in that home and closes it "
+            f"when it ends; `dispatch kill {claimants[0]['id']}` stops it now")
     substrate.close(Worker(id=worker_id, group=rec.get("inspect_group", "")),
                     release=False)
     rec["inspect_worker"] = ""

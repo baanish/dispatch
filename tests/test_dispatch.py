@@ -4541,6 +4541,32 @@ class TestInspectAttach(HerdrStubTestCase):
         self.assertIn("owns it now", output)
         self.assertTrue(records.load_record(rec["id"])["inspect_worker"])
 
+    def test_a_second_continue_cannot_adopt_a_pane_a_turn_is_already_in(self):
+        """Both read the same pointer on the parent. The second one used to type
+        its prompt into the first one's turn, and either could close the pane."""
+        self.with_a_terminal()
+        rec = self.finished_run()
+        self.run_cli("inspect", rec["id"], "--keep")
+        pane = records.load_record(rec["id"])["inspect_worker"]
+        first = self.make_live_record(state="running")
+        first["adopts_worker"] = pane
+        records.save_record(first)
+        prompts = len(self.stub.prompts)
+
+        with contextlib.redirect_stderr(io.StringIO()) as err:
+            code = self.run_cli("continue", rec["id"], "me too")
+        self.assertEqual(code, cli.EXIT_USAGE)
+        self.assertIn(first["id"], err.getvalue())
+        self.assertEqual(len(self.stub.prompts), prompts, "typed into a live turn")
+        loser = [r for r in records.all_records() if r.get("parent") == rec["id"]][0]
+        self.assertEqual(loser["state"], "failed")
+        self.assertNotIn(("pane", pane), self.stub.closed)
+
+        with contextlib.redirect_stderr(io.StringIO()) as err:
+            code = self.run_cli("inspect", rec["id"], "--close")
+        self.assertEqual(code, cli.EXIT_USAGE)
+        self.assertNotIn(("pane", pane), self.stub.closed)
+
     def test_a_kept_pane_is_still_reusable_by_continue(self):
         self.with_a_terminal()
         rec = self.finished_run()
