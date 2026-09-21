@@ -46,13 +46,14 @@ import posixpath
 import shlex
 import subprocess
 import time
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
 from .caps import reserve_slot, session_key
 from .errors import DispatchError
 from .policy import current_depth, parse_deadline, policy
-from .records import (append_status, dispatch_home, new_run_id, out_copy_dir,
+from .records import (append_status, atomic_replace, dispatch_home, new_run_id, out_copy_dir,
                       out_copy_path, release_run_lock, replace_bytes, replace_text,
                       run_dir, save_record,
                       utc_now, validate_run_id, write_out_copy,
@@ -331,9 +332,21 @@ def scp_up(machine, paths, remote_dir):
 
 def scp_down(machine, remote_path, local_path, seconds=SCP_SECONDS):
     """Copy one file off the machine. False when it was not there."""
+    # Into a name nobody could have put a link at, then moved over the target:
+    # scp writes through whatever is already at its destination.
+    local_path = Path(local_path)
+    landing = local_path.with_name(
+        f".{local_path.name}.{os.getpid()}.{uuid.uuid4().hex[:8]}.part")
     argv = ["scp", *ssh_options(machine),
-            f"{machine.ssh}:{scp_path(machine, remote_path)}", str(local_path)]
-    return run_program(machine, argv, seconds, check=False).returncode == 0
+            f"{machine.ssh}:{scp_path(machine, remote_path)}", str(landing)]
+    try:
+        if run_program(machine, argv, seconds, check=False).returncode != 0:
+            return False
+        atomic_replace(landing, local_path)
+        return True
+    finally:
+        with contextlib.suppress(OSError):
+            landing.unlink()
 
 
 # --------------------------------------------------------------------------
