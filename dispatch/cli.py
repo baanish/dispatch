@@ -308,10 +308,11 @@ def cmd_continue(args):
         raise DispatchError(
             f"{args.id} is still live; `continue` is for finished runs, "
             "`steer` corrects a live one")
-    deadline = getattr(args, "deadline", "") or ""
+    # The default deadline in the foreground too, as `run` has it: without one
+    # there is no check-in ladder, and a resumed worker that goes idle without
+    # answering holds its slot for good.
+    deadline = getattr(args, "deadline", "") or policy().default_deadline
     bg = bool(getattr(args, "bg", False))
-    if bg and not deadline:
-        deadline = policy().default_deadline
     opts = RunOptions(dir=rec.get("cwd") or os.getcwd(), write=bool(rec.get("write")),
                       net=bool(rec.get("net")), schema=rec.get("schema") or "",
                       bg=bg, deadline=deadline)

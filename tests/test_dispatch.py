@@ -4414,6 +4414,16 @@ class TestAcceptanceShouldFix(HerdrStubTestCase):
         child = [r for r in records.all_records() if r.get("parent") == rec_id][0]
         self.assertEqual(child["deadline_seconds"], 300)
 
+    def test_a_foreground_continue_gets_the_default_deadline_too(self):
+        """With none there is no check-in ladder at all, and a resumed worker
+        that goes idle without answering is never judged."""
+        self.run_cli("run", "opus@high", str(self.brief))
+        rec_id = self.only_record()["id"]
+        self.assertEqual(self.run_cli("continue", rec_id, "again"), cli.EXIT_OK)
+        child = [r for r in records.all_records() if r.get("parent") == rec_id][0]
+        self.assertEqual(child["deadline_seconds"],
+                         policy.parse_deadline(policy.policy().default_deadline))
+
     def test_no_heartbeat_after_the_exit_is_in_flight(self):
         original = records.HEARTBEAT_SECONDS
         records.HEARTBEAT_SECONDS = 0
