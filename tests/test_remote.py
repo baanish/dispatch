@@ -377,6 +377,23 @@ class TestTerminalMirror(FakeSshTestCase):
         self.assertEqual(self.local("out.md").read_text(encoding="utf-8"),
                          "the deliverable\n")
 
+    def test_wait_holds_until_the_answer_has_come_down(self):
+        """The machine said `done` but the copy failed: a waiter that returned
+        now would report success with nothing to show."""
+        calls = []
+        real = remote.scp_down
+
+        def flaky(*args, **kwargs):
+            calls.append(args)
+            return False if len(calls) <= 2 else real(*args, **kwargs)
+
+        with patch.object(remote, "scp_down", side_effect=flaky), \
+                patch.object(cli, "REMOTE_FOLLOW_SECONDS", 0.05):
+            code = cli.main(["wait", self.rec["id"]])
+        self.assertEqual(code, cli.EXIT_OK)
+        self.assertEqual(self.local("out.md").read_text(encoding="utf-8"),
+                         "the deliverable\n")
+
     def test_the_machines_record_lands_without_replacing_this_ones(self):
         self.main_out(["status"])
         mirrored = json.loads(self.local(remote.REMOTE_RECORD_FILE)

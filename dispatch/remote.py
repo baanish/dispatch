@@ -93,6 +93,9 @@ SCP_SECONDS = 300
 
 POLL_SECONDS = 2.0
 
+# How many more polls a finished run gets when its files would not copy down.
+MIRROR_RETRIES = 5
+
 # Copied down once, at terminal state. `run.json` lands beside them under its
 # own name: the local record is this run's identity, and overwriting it with the
 # remote's would lose the machine, the local directory, and the local id.
@@ -661,10 +664,16 @@ def mirror_remote_run(rec, machine=None):
 def wait_for_remote(rec, machine=None, poll_seconds=None):
     """Block until the machine says the run is over, mirroring what it produced."""
     machine = machine or machine_of_record(rec)
+    copies_left = MIRROR_RETRIES
     while True:
         rec = poll_remote_run(rec, machine)
+        # Over, and its files here: a run that ended while the copy down failed
+        # is polled again, or the caller is handed `done` with no answer. Only
+        # so many times, because a file that is not there will never arrive.
         if rec.get("state") in policy().terminal_states:
-            return rec
+            if not rec.get("mirror_pending") or copies_left <= 0:
+                return rec
+            copies_left -= 1
         time.sleep(POLL_SECONDS if poll_seconds is None else poll_seconds)
 
 

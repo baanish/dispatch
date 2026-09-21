@@ -1099,11 +1099,20 @@ def cmd_wait(args):
     status_path = Path(rec["dir"]) / "status.log"
     substrate = None if remote.is_remote(rec) else record_substrate_or_none(rec)
     started = time.time()
+    copies_left = remote.MIRROR_RETRIES
     while True:
         rec = load_record(rec["id"])
-        if remote.is_remote(rec) and rec.get("state") not in policy().terminal_states:
+        if remote.is_remote(rec) and (
+                rec.get("state") not in policy().terminal_states
+                or rec.get("mirror_pending")):
             rec = remote.reconcile_remote_run(rec)
-        if run_has_ended(rec, status_path):
+        # A remote run whose files have not come down yet has not ended for a
+        # waiter: reporting it now is `done` with no answer to print. It gets a
+        # few more polls, not forever, since a missing file never arrives.
+        if run_has_ended(rec, status_path) and rec.get("mirror_pending") \
+                and copies_left > 0:
+            copies_left -= 1
+        elif run_has_ended(rec, status_path):
             # The wrapper saves the state and then writes COMPLETE, so a record
             # read before that line landed is a record read one write too early.
             # Reading it again is what keeps a finished run from being reported
