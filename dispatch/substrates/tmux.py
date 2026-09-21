@@ -509,6 +509,11 @@ class TmuxSubstrate(Substrate):
                             tty_process_rows(tty, self.command_builder))
 
     def cpu_percent(self, pids):
+        if self.command_builder is not None:
+            # These pids are another machine's. Measured here they are some
+            # unrelated local process, or nothing, and the check-in ladder would
+            # kill a busy worker or keep a stuck one on that reading.
+            return None
         readings = [process_cpu_percent(pid) for pid in pids]
         readings = [reading for reading in readings if reading is not None]
         return sum(readings) if readings else None

@@ -14,6 +14,7 @@ import stat
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -374,6 +375,16 @@ class TestEnvironment(FakeTmuxTestCase):
 
 
 class TestWorkerProcesses(FakeTmuxTestCase):
+    def test_cpu_is_unknown_for_a_worker_on_another_machine(self):
+        """Its pids are that machine's. Read here they are somebody else's
+        process, and the check-in would judge the worker on it."""
+        from dispatch.substrates import tmux as tmux_module
+        remote_substrate = get_substrate(
+            "tmux", command_builder=lambda argv: [str(self.bin / "tmux")] + argv[1:])
+        with patch.object(tmux_module, "process_cpu_percent",
+                          side_effect=AssertionError("measured a remote pid here")):
+            self.assertIsNone(remote_substrate.cpu_percent([os.getpid()]))
+
     def codex_worker(self):
         """A pane whose shell forks a worker when the lane command is typed."""
         self.update_state(replies=[{"match": "codex", "running": True,
