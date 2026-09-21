@@ -5161,10 +5161,15 @@ class TestSelfUpdateRespawn(HerdrStubTestCase):
         rec = self.make_live_record()
         wrapper = runner.RunWrapper(herdr.HerdrSubstrate(), rec)
         wrapper.attach()
-        wrapper.substrate = type("S", (), {
-            "screen_since_spawn": lambda *a: "Update ran successfully! restart"})()
+        screen = {"screen_since_spawn": lambda *a: "Update ran successfully! restart"}
+        wrapper.substrate = type("Pane", (), dict(screen, has_tui=True))()
         self.assertTrue(wrapper.update_exit_marker())
         wrapper._worked_since_prompt = True
+        self.assertEqual(wrapper.update_exit_marker(), "")
+        # Headless: the brief is in the command line, and no look ever sees the
+        # worker working, so the flag above stays false for the whole run.
+        wrapper._worked_since_prompt = False
+        wrapper.substrate = type("Headless", (), dict(screen, has_tui=False))()
         self.assertEqual(wrapper.update_exit_marker(), "")
 
     def test_a_codex_update_exit_is_respawned_and_the_run_completes(self):

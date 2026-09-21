@@ -1636,11 +1636,13 @@ class RunWrapper:
         """
         if self.deliverable_landed():
             return ""
-        if self._worked_since_prompt:
+        if self._worked_since_prompt or not self.substrate.has_tui:
             # It took the brief and worked on it, so the text on its screen is
             # the worker's and its tools'. A banner phrase in that ("installed
             # successfully", from a package manager) is not the CLI's updater,
-            # and relaunching would run the whole brief a second time.
+            # and relaunching would run the whole brief a second time. A
+            # headless worker has its brief from the moment it starts, and
+            # nothing here ever sees it working, so it is never relaunched.
             return ""
         markers = self.driver.update_markers
         if not markers:
