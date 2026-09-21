@@ -56,7 +56,11 @@ LANE_KEYS = ("driver", "model", "efforts", "tier", "alt_tiers", "tier_aliases",
 MACHINE_KEYS = ("ssh", "dispatch", "mode", "home", "shell")
 # `when` is a sibling table of the slots, so that a slot stays a lane string.
 BOARD_KEYS = SLOTS + ("when",)
-SECTIONS = ("general", "caps", "policy", "lanes", "machines", "board")
+SECTIONS = ("general", "caps", "policy", "worker_env", "lanes", "machines", "board")
+
+# The markers dispatch sets in a worker's environment itself. `[worker_env]` may
+# not name them: the depth marker decided by a config file is no ladder.
+OWN_WORKER_ENV = ("AGENT_DEPTH", "DISPATCH_SESSION", "DISPATCH_RUN")
 
 # Where `dispatch init` installs the skill, keyed by the parent directory whose
 # presence means the tool is installed for this operator.
@@ -311,7 +315,25 @@ def _policy(data, config, path):
                                                  "policy", path)
 
     changes["depth1_lane_keys"] = _depth1_keys(rules, lanes, board, path)
+    changes["worker_env"] = _worker_env(_table(data, "worker_env", "", path), path)
     return replace(Policy(), **changes)
+
+
+def _worker_env(table, path):
+    """The shipped worker variables with the file's laid over them.
+
+    Laid over rather than replacing, so adding one variable does not quietly
+    drop the shipped ones. An empty value takes a variable out.
+    """
+    merged = dict(Policy().worker_env)
+    for name, value in table.items():
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name) or name in OWN_WORKER_ENV:
+            raise DispatchError(
+                f"{path}: [worker_env] {name}: not a variable a config may set")
+        if not isinstance(value, str):
+            raise DispatchError(f"{path}: [worker_env] {name}: expected a string")
+        merged[name] = value
+    return tuple((name, value) for name, value in merged.items() if value)
 
 
 def _depth1_keys(rules, lanes, board, path):

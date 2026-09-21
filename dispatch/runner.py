@@ -360,9 +360,12 @@ def run_env(run_id, driver):
     into the daemon's launch environment would quietly move a subscription lane
     onto per-token billing.
     """
-    env = {DEPTH_ENV: str(child_depth()),
-           "DISPATCH_SESSION": session_key(),
-           "DISPATCH_RUN": str(run_id)}
+    # The operator's own variables first, so dispatch's markers cannot be
+    # displaced by them.
+    env = dict(policy().worker_env)
+    env.update({DEPTH_ENV: str(child_depth()),
+                "DISPATCH_SESSION": session_key(),
+                "DISPATCH_RUN": str(run_id)})
     for var in blanked_keys(driver):
         env[var] = ""
     return env

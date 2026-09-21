@@ -52,6 +52,7 @@ from ..errors import DispatchError
 from ..processes import (descendant_pids, pid_alive, pid_is_zombie, popen_detached,
                          pids_cpu_percent, resolve_python, stop_pid,
                          stop_process_group)
+from ..policy import policy
 from ..records import (open_append, read_tail_bytes, replace_text, run_dir,
                        runs_root)
 from .base import (Substrate, SubstrateCapabilities, SubstrateError, SpawnResult,
@@ -95,13 +96,17 @@ def launch_environment(saved, blanked=()):
     A respawn after a CLI self-update starts the relay again from this state, as
     the operator and outside any sandbox. A `PYTHONPATH` written into it would
     have that relay import the worker's code, so only dispatch's own markers are
-    carried over, and the driver's metered keys when they are blank. An empty
+    carried over, the operator's `[worker_env]` variables at the values the
+    config gives them, and the driver's metered keys when they are blank. An empty
     value is not harmless under any other name: an empty `PATH` or `HOME` is a
     different environment.
     """
+    configured = dict(policy().worker_env)
     return {name: value for name, value in (saved or {}).items()
             if isinstance(value, str)
-            and (name in LAUNCH_ENV_NAMES or (name in blanked and value == ""))}
+            and (name in LAUNCH_ENV_NAMES
+                 or configured.get(name) == value
+                 or (name in blanked and value == ""))}
 
 
 class HeadlessSubstrate(Substrate):

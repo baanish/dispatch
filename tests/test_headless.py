@@ -276,6 +276,22 @@ class TestHeadlessLiveness(HeadlessTestCase):
         self.assertEqual(kept, {"AGENT_DEPTH": "1", "DISPATCH_RUN": "r",
                                 "OPENAI_API_KEY": ""})
 
+    def test_a_headless_worker_receives_everything_run_env_sets(self):
+        """The filter names what it lets through, so a variable added to the
+        worker environment and not to that list would reach every worker but a
+        headless one."""
+        from dispatch.substrates import headless
+        for name in ("codex", "claude", "grok"):
+            driver = drivers.get_driver(name)
+            env = runner.run_env("r", driver)
+            self.assertIn("CLAUDE_CODE_PROMPT_CACHE_TTL", env)
+            self.assertEqual(
+                headless.launch_environment(env, driver.metered_key_vars), env, name)
+        # At the configured value only: the state file is the worker's to rewrite.
+        env["CLAUDE_CODE_PROMPT_CACHE_TTL"] = "planted"
+        self.assertNotIn("CLAUDE_CODE_PROMPT_CACHE_TTL",
+                         headless.launch_environment(env))
+
     def test_a_status_file_written_while_the_relay_runs_ends_nothing(self):
         """The relay writes worker.rc as its last act. One that shows up while
         the relay is still running came from the worker, and believing it ended

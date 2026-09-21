@@ -56,6 +56,16 @@ class Policy:
     # running on an API key.
     blank_metered_keys: bool = False
 
+    # Extra variables every worker starts with, as (name, value) pairs. The
+    # shipped one is for any `claude` a worker runs, whether the worker is one
+    # or spawns one with `claude -p`: to Claude Code that is a main
+    # conversation, which on a subscription defaults to the one-hour prompt
+    # cache, whose writes cost 2x base input against 1.25x for the five-minute
+    # one. A worker runs its brief start to finish and is never resumed, so its
+    # turns land seconds apart, each read refreshes the entry for free, and the
+    # rest of the hour is paid for on every turn's write and never used.
+    worker_env: tuple = (("CLAUDE_CODE_PROMPT_CACHE_TTL", "5m"),)
+
     # Which lanes a depth-1 worker may spawn, by lane key. The board replaces
     # this with whatever fills its `light` slot; until then it is the set a
     # bulk mechanical subtask is cheap enough to run on.

@@ -11,6 +11,7 @@ which a real daemon would not oblige.
 """
 
 import contextlib
+import dataclasses
 import io
 import os
 import subprocess
@@ -356,6 +357,21 @@ class TestPaneLifecycle(HerdrTestCase):
         os.environ["AGENT_DEPTH"] = "1"
         env = runner.run_env("r", drivers.get_driver("codex"))
         self.assertEqual(env["AGENT_DEPTH"], "2")
+
+    def test_run_env_shortens_the_prompt_cache_for_a_workers_claude(self):
+        """Every driver, because a codex or grok worker can run `claude -p` too,
+        and that is the main conversation the one-hour default applies to."""
+        for name in ("codex", "claude", "grok"):
+            env = runner.run_env("r", drivers.get_driver(name))
+            self.assertEqual(env["CLAUDE_CODE_PROMPT_CACHE_TTL"], "5m", name)
+
+    def test_a_configured_variable_cannot_displace_the_depth_marker(self):
+        current = policy.policy()
+        self.addCleanup(policy.set_policy, current)
+        policy.set_policy(dataclasses.replace(current, worker_env=(("AGENT_DEPTH", "0"),
+                                                       ("TMPDIR", "/scratch"))))
+        env = runner.run_env("r", drivers.get_driver("codex"))
+        self.assertEqual((env["AGENT_DEPTH"], env["TMPDIR"]), ("1", "/scratch"))
 
     def test_send_line_types_then_presses_enter(self):
         self.substrate().send_line(self.worker, "echo hi")

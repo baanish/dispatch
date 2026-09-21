@@ -244,7 +244,7 @@ class TestValidation(ConfigTestCase):
         message = self.message_for("[lane]\nmine = 1\n")
         self.assertIn("config.toml", message)
         self.assertIn("[lane]", message)
-        self.assertIn("general, caps, policy, lanes, machines, board", message)
+        self.assertIn("general, caps, policy, worker_env, lanes, machines, board", message)
 
     def test_an_unknown_lane_key_names_the_lane_and_the_key(self):
         message = self.message_for('[lanes.mini]\ndriver = "codex"\n'
@@ -689,6 +689,24 @@ class TestVerbs(ConfigTestCase):
         self.assertEqual(code, cli.EXIT_OK)
         code, out = self.run_cli("board")
         self.assertEqual(code, cli.EXIT_OK, out)
+
+    def test_worker_env_is_laid_over_the_shipped_variables(self):
+        """Adding one must not drop the shipped ones, an empty value takes one
+        out, and the markers dispatch sets itself are not a config's to name."""
+        self.write_user_config('[worker_env]\nTMPDIR = "/scratch/tmp"\n')
+        env = dict(config.load_config().policy.worker_env)
+        self.assertEqual(env, {"CLAUDE_CODE_PROMPT_CACHE_TTL": "5m",
+                               "TMPDIR": "/scratch/tmp"})
+        self.write_user_config('[worker_env]\nCLAUDE_CODE_PROMPT_CACHE_TTL = ""\n')
+        self.assertEqual(config.load_config().policy.worker_env, ())
+        for body in ('[worker_env]\nAGENT_DEPTH = "0"\n',
+                     '[worker_env]\n"BAD NAME" = "x"\n',
+                     '[worker_env]\nTMPDIR = 5\n'):
+            with self.subTest(body=body):
+                self.write_user_config(body)
+                with self.assertRaises(DispatchError) as caught:
+                    config.load_config()
+                self.assertIn("[worker_env]", str(caught.exception))
 
     def test_config_mistakes_are_named_at_load_not_met_later(self):
         """An empty [lanes] table used to bring the built-in lanes back, an

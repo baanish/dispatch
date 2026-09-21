@@ -274,7 +274,7 @@ the machine is reached as `operator@workshop` and you call it `workshop`:
    step 3: a shell-mode lane is resolved by this machine.
 3. Give the machine a config defining every lane name you will send it, with
    `dispatch init --preset <name>` on the machine or by copying your `[lanes]`
-   table over. Caps and metered-key blanking for the run are that machine's
+   table over. Caps, `[worker_env]`, and metered-key blanking for the run are that machine's
    config; the deadline crosses with the run.
 4. Name the machine here, and check the path to it:
 
@@ -323,6 +323,10 @@ default_deadline = "30m"        # check-in interval when --deadline is absent
 human_hand_timeout = "30m"      # wait at a dialog only a human can answer; "forever" allowed
 blank_metered_keys = false      # blank the driver's listed credential variables in the worker's environment
 depth1_lanes = ["astra"]        # lane keys, each at any effort; omit to take the `light` slot's key
+
+[worker_env]                    # extra variables every worker starts with; default: the one below
+CLAUDE_CODE_PROMPT_CACHE_TTL = "5m"   # "" takes a shipped variable out
+TMPDIR = "/scratch/agents"      # your own are laid over the shipped ones
 
 [lanes.astra]                   # a [lanes] table replaces the built-in set wholesale
 driver = "codex"                # codex, claude, or grok; required
@@ -382,6 +386,15 @@ run is judged on signals that cost nothing (screen movement, CPU, whether the
 deliverable exists), and a working worker is bought another interval. Only a
 demonstrably dead, stuck, or blocked one is ended, so `--deadline` caps no
 runtime.
+
+`[worker_env]` is the environment every worker starts with on top of its
+shell's. It ships with `CLAUDE_CODE_PROMPT_CACHE_TTL = "5m"`, for any `claude` a
+worker runs: Claude Code treats that as a main conversation, which on a
+subscription defaults to the one-hour prompt cache, and a worker that runs its
+brief start to finish and is never resumed pays that cache's dearer writes on
+every turn and never uses the hour. Your own variables are laid over the shipped
+ones, an empty value takes one out, and `AGENT_DEPTH`, `DISPATCH_SESSION`, and
+`DISPATCH_RUN` are dispatch's own and cannot be set here.
 
 Metered key blanking empties the driver's listed credential variables in the
 environment the worker is launched with. That is all it does: which account a
