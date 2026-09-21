@@ -503,8 +503,13 @@ def remote_env(rec, machine):
 
 
 def remote_run_argv(machine, rec, brief, schema="", image=""):
-    """The `dispatch run` the machine will execute. Every path is the machine's."""
-    argv = [machine.dispatch, "run", rec["lane"], brief, "--bg"]
+    """The `dispatch run` the machine will execute. Every path is the machine's.
+
+    Pinned to that machine, because placement is settled by the time this is
+    built: the lane is resolved against the machine's own config, and a lane
+    that names a machine there would send a run off the box it was placed on.
+    """
+    argv = [machine.dispatch, "run", rec["lane"], brief, "--bg", "--on", LOCAL]
     if rec["cwd"]:
         argv += ["--dir", rec["cwd"]]
     if rec["write"]:

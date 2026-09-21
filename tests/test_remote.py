@@ -105,6 +105,14 @@ class TestRemoteLaunch(FakeSshTestCase):
         self.assertIn(f"dispatch run astra@medium {staged_path(rec)}/brief.md --bg",
                       launch)
 
+    def test_the_machine_is_told_to_run_it_and_not_to_place_it_again(self):
+        """It resolves the lane against its own config, where that lane may
+        name a machine, and the run would leave the box it was placed on."""
+        self.launched()
+        self.run_remote_bg()
+        launch = [c for c in self.commands() if "dispatch run" in c][0]
+        self.assertIn(f"--on {remote.LOCAL}", launch)
+
     def test_a_home_with_a_space_in_it_is_staged_to_that_exact_path(self):
         """scp transfers over SFTP, which takes the pathname literally, so a
         shell-quoted path would stage the brief under a name holding quotes."""
