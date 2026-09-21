@@ -45,6 +45,7 @@ import os
 import posixpath
 import shlex
 import subprocess
+import sys
 import time
 import uuid
 from dataclasses import dataclass
@@ -761,8 +762,18 @@ def wait_for_remote(rec, machine=None, poll_seconds=None):
     """Block until the machine says the run is over, mirroring what it produced."""
     machine = machine or machine_of_record(rec)
     copies_left = MIRROR_RETRIES
+    told = False
     while True:
-        rec = poll_remote_run(rec, machine)
+        # A poll that fails is a connection that dropped, not a run that ended:
+        # the worker is still going over there. Raising here ended the command
+        # with a usage error and no run id, and a caller that then launched the
+        # brief again put a second worker on the same checkout.
+        rec = reconcile_remote_run(rec)
+        if rec.get("remote_error") and not told:
+            told = True
+            print(f"dispatch: {rec['id']} is still running on {machine.name}, which "
+                  f"did not answer ({rec['remote_error']}); still polling, and "
+                  f"`dispatch wait {rec['id']}` picks it up again", file=sys.stderr)
         # Over, and its files here: a run that ended while the copy down failed
         # is polled again, or the caller is handed `done` with no answer. Only
         # so many times, because a file that is not there will never arrive.

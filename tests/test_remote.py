@@ -247,6 +247,30 @@ class TestRemoteLaunch(FakeSshTestCase):
         self.assertIn("did not report a run id", rec["error"])
         self.assertIn("may be running there", rec["error"])
 
+    def test_a_foreground_run_outlives_a_poll_that_fails(self):
+        """One dropped connection used to end the command with a usage error
+        and no run id, while the worker carried on over there."""
+        run_id, remote_dir = self.launched()
+        self.remote_record(run_id, state="done", rc=0,
+                           finished="2026-01-01T00:00:00Z")
+        self.remote_file(f"{remote_dir}/out.md", "the deliverable\n")
+        real, calls = remote.poll_remote_run, []
+
+        def flaky(rec, machine=None):
+            calls.append(rec["id"])
+            if len(calls) == 1:
+                raise DispatchError("machine box is not reachable: timed out")
+            return real(rec, machine)
+
+        with patch.object(remote, "poll_remote_run", side_effect=flaky), \
+                patch.object(remote, "POLL_SECONDS", 0.01), \
+                contextlib.redirect_stderr(io.StringIO()) as err:
+            out = self.main_out(["run", "astra@medium", str(self.brief),
+                                 "--on", self.machine_name])
+        self.assertIn("the deliverable", out)
+        self.assertIn(calls[0], err.getvalue())
+        self.assertIn("still running", err.getvalue())
+
     def test_a_foreground_run_waits_for_the_machine_and_prints_what_it_wrote(self):
         run_id, remote_dir = self.launched()
         self.remote_record(run_id, state="done", rc=0,
