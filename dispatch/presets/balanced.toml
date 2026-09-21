@@ -43,7 +43,7 @@ efforts = ["high"]
 
 [lanes.grok]
 driver = "grok"
-model = "grok-4.6"
+model = "grok-4.7"
 efforts = ["high"]
 
 [board]

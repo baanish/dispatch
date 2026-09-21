@@ -63,7 +63,7 @@ DEFAULT_LANE_TABLE = {
                       tier="default", alt_tiers=("default", "priority"),
                       tier_aliases={"fast": "priority"}),
     "opus": LaneSpec("claude", "claude-opus-5", ("medium", "high")),
-    "grok": LaneSpec("grok", "grok-4.6", ("high",)),
+    "grok": LaneSpec("grok", "grok-4.7", ("high",)),
 }
 
 DEFAULT_LANE = "astra@medium"

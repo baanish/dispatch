@@ -63,7 +63,7 @@ class TestLanes(HerdrStubTestCase):
             lanes.resolve_lane("sol@medium")
 
     def test_the_grok_lane_names_the_model_the_preset_ships(self):
-        self.assertEqual(lanes.resolve_lane("grok@high").model, "grok-4.6")
+        self.assertEqual(lanes.resolve_lane("grok@high").model, "grok-4.7")
 
     def test_unknown_lane_is_a_hard_error_listing_valid_lanes(self):
         with self.assertRaises(errors.DispatchError) as caught:
@@ -218,7 +218,7 @@ class TestLanes(HerdrStubTestCase):
                                         records.RunOptions(dir="/w"),
                                         session_id="00000000-1111-2222-3333-444444444444")
         self.assertEqual(argv, [
-            "grok", "-m", "grok-4.6",
+            "grok", "-m", "grok-4.7",
             "--reasoning-effort", "high",
             "--permission-mode", "auto",
             "--no-subagents",
