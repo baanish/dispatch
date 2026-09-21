@@ -153,8 +153,8 @@ directory under `~/.dispatch/runs/` holds its answer next to dispatch's own
 records. dispatch replaces the files it writes there rather than writing through
 them, so a name a worker has turned into a symlink is replaced and not followed;
 on POSIX an append refuses a link outright, and the `--out` copy is anchored by
-inode to the directory recorded at launch, where Windows, which has no
-unprivileged symlinks, checks that path instead. dispatch reads nothing from the
+inode to the directory recorded at launch, where Windows, on which making a
+symlink takes a privilege, checks that path instead. dispatch reads nothing from the
 task directory, but a worker that can write in its run directory can still
 corrupt that run's records. Work you consider hostile
 belongs under a separate account, container, or VM that holds only the checkout
@@ -198,7 +198,7 @@ CLI.
 | Substrate | The worker lives in | `steer` | `inspect` | Screen | Dialogs |
 | --- | --- | --- | --- | --- | --- |
 | `herdr` | A pane in a workspace, with agent detection | yes | yes | yes | answered by rule |
-| `tmux` | A detached tmux session, `dispatch-<run id>` | yes | yes | yes | only those the driver names |
+| `tmux` | A detached tmux session, named from the run id | yes | yes | yes | only those the driver names |
 | `headless` | A subprocess running the CLI's one-shot form | no | no | log only | none is raised |
 
 herdr is preferred where its daemon is listening, because it is the only one of

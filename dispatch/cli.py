@@ -523,8 +523,8 @@ def cmd_status(args):
     if not records:
         print("no runs")
         return EXIT_OK
-    # Reading status is also what settles detached runs: no supervisor process
-    # exists to do it, so the operator looking is the trigger.
+    # Reading status is also what settles a detached run whose watcher is gone:
+    # no daemon supervises runs, so the operator looking is the trigger.
     with contextlib.suppress(SubstrateError, OSError):
         live_records(sweep())
     records = all_records()

@@ -1,14 +1,11 @@
 """The tmux substrate: one detached tmux session per run, the worker in its pane.
 
-Every run gets a session of its own, named `dispatch-<run id>`, holding one
-window with one pane. The session is created detached and dispatch never
-attaches the operator to it: a live run is followed with `dispatch watch`, which
-reads the pane. To look at one by hand:
-
-    tmux attach -t dispatch-<run id>
-
-and leave it again with the prefix key followed by `d`. `dispatch inspect` runs
-that attach for the operator.
+Every run gets a session of its own, named `dispatch-` plus the run id with
+everything tmux forbids in a name replaced (see `session_name`), holding one
+window with one pane. The session is created detached: a live run is followed
+with `dispatch watch`, which reads the pane, and `dispatch watch <id> --attach`
+or `dispatch inspect` attaches the operator to it. Leave it again with the
+prefix key followed by `d`.
 
 What tmux offers, and what it costs:
 
