@@ -300,6 +300,37 @@ class TestRemoteProxy(FakeSshTestCase):
         self.assertEqual(rec["rc"], 0)
         self.assertEqual(caps.live_records(), [])
 
+    def test_a_record_for_another_run_is_not_taken_as_this_ones(self):
+        """Whatever a poll merges is read afterwards as this run's own state,
+        so another run's `done` and exit code would end this one."""
+        self.remote_record(self.remote_id, id="astra@medium-990000-zzzz",
+                           state="done", rc=0, finished="2026-01-01T00:00:00Z")
+        self.main_out(["status"])
+        rec = records.load_record(self.rec["id"])
+        self.assertEqual(rec["state"], "running")
+        self.assertIn("astra@medium-990000-zzzz", rec["remote_error"])
+
+    def test_a_record_that_is_not_an_object_is_a_remote_error(self):
+        """A machine mid-write answers `null` as readily as a record, and the
+        poll that reads it has to fail the way an unreachable machine does."""
+        self.remote_file(f"{self.remote_dir}/run.json", "null\n")
+        self.main_out(["status"])
+        rec = records.load_record(self.rec["id"])
+        self.assertEqual(rec["state"], "running")
+        self.assertIn("not a run record", rec["remote_error"])
+
+    def test_a_field_the_machine_did_not_write_as_dispatch_does_is_refused(self):
+        """`state` decides whether the run is over and `rc` is its exit code."""
+        self.remote_record(self.remote_id, state="finished")
+        self.main_out(["status"])
+        self.assertIn("not a state dispatch has",
+                      records.load_record(self.rec["id"])["remote_error"])
+        self.remote_record(self.remote_id, state="done", rc="0")
+        self.main_out(["status"])
+        rec = records.load_record(self.rec["id"])
+        self.assertEqual(rec["state"], "running")
+        self.assertIn("rc='0'", rec["remote_error"])
+
     def test_kill_proxies_to_the_machine(self):
         self.set_replies([["dispatch kill",
                            {"stdout": f"{self.remote_id} killed\n"}]])

@@ -13,6 +13,7 @@ which a real daemon would not oblige.
 import contextlib
 import dataclasses
 import io
+import json
 import os
 import subprocess
 import sys
@@ -127,6 +128,45 @@ class TestClient(HerdrTestCase):
         client = herdr.HerdrClient(self.stub.path)
         self.assertEqual(client._next_id("pane.split"), "dispatch:pane:split:1")
         self.assertEqual(client._next_id("pane.split"), "dispatch:pane:split:2")
+
+    def test_a_reply_to_some_other_request_is_not_this_calls_answer(self):
+        """A pane's contents, a worker's status, and a run's exit code are all
+        read out of the body that comes back."""
+        client = herdr.HerdrClient(self.stub.path, transport=ScriptedTransport(
+            {"id": "dispatch:pane:read:99", "result": {"text": "not yours"}}))
+        with self.assertRaises(herdr.HerdrError) as caught:
+            client.ping()
+        self.assertIn("reply to 'dispatch:pane:read:99'", str(caught.exception))
+
+    def test_a_reply_that_is_not_one_answer_is_refused(self):
+        """Whatever is listening on that socket path can send anything; a
+        result and an error at once has no reading, and neither has none."""
+        for reply in (b"[1, 2]\n", {"result": {}, "error": {"code": "x"}},
+                      {}, {"result": ["a pane"]}):
+            with self.subTest(reply=reply):
+                client = herdr.HerdrClient(self.stub.path,
+                                           transport=ScriptedTransport(reply))
+                with self.assertRaises(herdr.HerdrError):
+                    client.ping()
+
+
+class ScriptedTransport:
+    """An endpoint that answers with what the case wrote, not with an answer.
+
+    A mapping goes out as the reply, carrying the request's own id unless the
+    case named one; bytes go out as they are, for a reply that is not a message
+    at all.
+    """
+
+    def __init__(self, reply):
+        self.reply = reply
+
+    def request(self, payload, timeout=None):
+        if isinstance(self.reply, bytes):
+            return self.reply
+        message = dict(self.reply)
+        message.setdefault("id", json.loads(payload.decode("utf-8"))["id"])
+        return (json.dumps(message) + "\n").encode("utf-8")
 
 
 class DeniedTransport:

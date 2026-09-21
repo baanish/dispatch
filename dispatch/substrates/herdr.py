@@ -508,28 +508,38 @@ class HerdrClient:
         payload = json.dumps({"id": request_id, "method": method,
                               "params": params or {}}) + "\n"
         try:
-            message = self.transact(method, payload, timeout)
+            message = self.transact(method, payload, timeout, request_id)
         except HerdrDaemonDown as exc:
             self.repair_daemon(exc)     # raises if there is nothing left to try
             self.note(f"RETRY {utc_now()} herdr answered after the repair; "
                       f"retrying {method}")
-            message = self.transact(method, payload, timeout)
+            message = self.transact(method, payload, timeout, request_id)
         except HerdrAccessDenied as exc:
             self.note(f"REPAIR-REFUSED {utc_now()} {exc}")
             raise
         if "error" in message:
-            body = message.get("error") or {}
+            body = message["error"]
             raise HerdrCallError(method, body.get("code", "unknown"),
                                  body.get("message", ""))
-        return message.get("result") or {}
+        result = message.get("result") or {}
+        if not isinstance(result, dict):
+            raise HerdrError(f"herdr {method} answered with a "
+                             f"{type(result).__name__} where its result body "
+                             "should be")
+        return result
 
-    def transact(self, method, payload, timeout):
-        """One request on the wire, parsed into its message.
+    def transact(self, method, payload, timeout, request_id):
+        """One request on the wire, parsed into the reply to it.
 
         Raises HerdrDaemonDown for either way herdr says nothing is serving: the
         transport not reaching the endpoint, and an endpoint that answers
         `server_not_running`. Both are the same operator problem and take the
         same repair.
+
+        Whatever is listening on that socket path has to answer this request
+        and carry exactly one of a reply's two arms. A pane's contents, a
+        worker's status, and a run's exit code are all read out of what comes
+        back, so a reply that is not to this request is not this call's answer.
         """
         try:
             line = self.transport.request(payload.encode("utf-8"), timeout)
@@ -544,11 +554,29 @@ class HerdrClient:
         except ValueError as exc:
             raise HerdrError(
                 f"herdr {method} returned non-JSON: {line[:200]!r}") from exc
-        body = message.get("error") or {}
-        if body.get("code") == SERVER_DOWN_CODE:
+        if not isinstance(message, dict):
+            raise HerdrError(
+                f"herdr {method} returned {line[:200]!r}, which is not a reply")
+        body = message.get("error")
+        # Before the request id is checked: an endpoint with no daemon behind it
+        # has no request to answer, and the repair is the same either way.
+        if isinstance(body, dict) and body.get("code") == SERVER_DOWN_CODE:
             raise HerdrDaemonDown(f"herdr {method} failed "
                                   f"[{SERVER_DOWN_CODE}]: "
                                   f"{body.get('message', '')}")
+        if message.get("id") != request_id:
+            raise HerdrError(
+                f"herdr answered {method} ({request_id}) with a reply to "
+                f"{message.get('id')!r}")
+        if "error" in message and "result" in message:
+            raise HerdrError(f"herdr {method} answered with a result and an "
+                             "error at once, and only one of them can be true")
+        if "error" not in message and "result" not in message:
+            raise HerdrError(f"herdr {method} answered with neither a result "
+                             f"nor an error: {line[:200]!r}")
+        if "error" in message and not isinstance(body, dict):
+            raise HerdrError(f"herdr {method} failed and gave {body!r} as the "
+                             "reason, which is not an error body")
         return message
 
     def repair_daemon(self, exc):
@@ -575,12 +603,14 @@ class HerdrClient:
     def wait_for_daemon(self):
         """Poll the endpoint until a ping comes back, bounded. True if it did."""
         deadline = time.time() + SPAWN_WAIT_SECONDS
-        payload = json.dumps({"id": self._next_id("ping"), "method": "ping",
+        request_id = self._next_id("ping")
+        payload = json.dumps({"id": request_id, "method": "ping",
                               "params": {}}) + "\n"
         while True:
             remaining = deadline - time.time()
             with contextlib.suppress(HerdrError, OSError):
-                self.transact("ping", payload, max(SPAWN_POLL_SECONDS, remaining))
+                self.transact("ping", payload, max(SPAWN_POLL_SECONDS, remaining),
+                              request_id)
                 return True
             if time.time() >= deadline:
                 return False

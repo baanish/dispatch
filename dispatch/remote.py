@@ -104,12 +104,16 @@ MIRROR_RETRIES = 5
 MIRRORED_FILES = ("out.md", "out.json", "status.log", "screen.log")
 REMOTE_RECORD_FILE = "remote-run.json"
 
-# What a poll takes from the remote record. Deliberately not `worker_id`: the
-# worker exists in the remote's substrate, and a local sweep that found the id
-# in a record would look for it here and call the run orphaned.
-POLLED_FIELDS = ("state", "rc", "finished", "error", "session_id", "needs_hand",
-                 "checkins", "checkin_verdict", "aborted", "started_at",
-                 "deliverable_written")
+# What a poll takes from the remote record, and the shape each may arrive in.
+# Deliberately not `worker_id`: the worker exists in the remote's substrate, and
+# a local sweep that found the id in a record would look for it here and call
+# the run orphaned. The shapes are checked because the record is another
+# machine's JSON, and whatever a poll merges is read afterwards as this run's
+# own state.
+POLLED_FIELDS = {"state": str, "rc": int, "finished": str, "error": str,
+                 "session_id": str, "needs_hand": str, "checkins": int,
+                 "checkin_verdict": str, "aborted": bool,
+                 "started_at": (int, float), "deliverable_written": bool}
 
 
 @dataclass(frozen=True)
@@ -635,6 +639,41 @@ def poll_command(rec, machine):
     return f"{reconcile} >{sink} 2>&1; {record}"
 
 
+def polled_changes(reported, rec, machine):
+    """What a poll may take from the record the machine sent, checked first.
+
+    The whole of this run's state arrives here as JSON written on a machine
+    this one only reaches over ssh. Merged unread, a record of some other run
+    supplies this one's verdict, and a null or a list ends the poll in a
+    TypeError rather than the remote error `reconcile_remote_run` records.
+    """
+    if not isinstance(reported, dict):
+        raise DispatchError(
+            f"machine {machine.name}: {rec['remote_id']} answered with "
+            f"{type(reported).__name__}, which is not a run record")
+    if reported.get("id") != rec["remote_id"]:
+        raise DispatchError(
+            f"machine {machine.name}: asked for {rec['remote_id']} and was "
+            f"given the record of {reported.get('id')!r}")
+    changes = {}
+    for field, shape in POLLED_FIELDS.items():
+        if field not in reported:
+            continue
+        value = reported[field]
+        if value is not None and not isinstance(value, shape):
+            raise DispatchError(
+                f"machine {machine.name}: {rec['remote_id']} reported "
+                f"{field}={value!r}, which is not how dispatch writes it")
+        changes[field] = value
+    state = changes.get("state")
+    if state is not None and state not in {"reserved", "running",
+                                           *policy().terminal_states}:
+        raise DispatchError(
+            f"machine {machine.name}: {rec['remote_id']} reported state "
+            f"{state!r}, which is not a state dispatch has")
+    return changes
+
+
 def poll_remote_run(rec, machine=None):
     """Ask the machine how the run is going, and fold the answer into the record.
 
@@ -651,9 +690,7 @@ def poll_remote_run(rec, machine=None):
         raise DispatchError(
             f"machine {machine.name}: {rec['remote_id']} has no readable record "
             f"({exc})") from exc
-    for field in POLLED_FIELDS:
-        if field in reported:
-            rec[field] = reported[field]
+    rec.update(polled_changes(reported, rec, machine))
     rec["polled"] = utc_now()
     rec.pop("remote_error", None)
     save_record(rec)

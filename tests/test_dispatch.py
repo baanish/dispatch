@@ -1983,6 +1983,20 @@ class TestSessionCapture(HerdrStubTestCase):
         self.assertEqual(drivers.get_driver("codex").capture_session(started, str(self.work)),
                          (mine, str(sessions / "rollout-mine.jsonl"), False))
 
+    def test_a_rollout_that_is_not_shaped_like_one_does_not_end_the_search(self):
+        """The day's directory holds every codex anyone ran, and one file
+        dispatch cannot read is not a reason to lose this run's session."""
+        sessions = self.rollout_dir()
+        started = time.time()
+        mine = "00000000-1111-2222-3333-444444444444"
+        (sessions / "rollout-a-list.jsonl").write_text("[1]\n", encoding="utf-8")
+        (sessions / "rollout-b-payload.jsonl").write_text(
+            '{"payload": [1]}\n', encoding="utf-8")
+        self.write_rollout(sessions / "rollout-c-mine.jsonl", mine, str(self.work))
+        self.assertEqual(
+            drivers.get_driver("codex").capture_session(started, str(self.work)),
+            (mine, str(sessions / "rollout-c-mine.jsonl"), False))
+
     def test_a_rollout_with_no_matching_cwd_is_not_guessed_at(self):
         sessions = self.root / "codex" / "sessions" / time.strftime("%Y/%m/%d",
                                                                    time.gmtime())

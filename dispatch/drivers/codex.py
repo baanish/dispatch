@@ -38,9 +38,14 @@ def read_session_meta(path):
     except OSError:
         return "", ""
     try:
-        payload = (json.loads(first) or {}).get("payload") or {}
+        meta = json.loads(first)
     except ValueError:
         return "", ""
+    # A rollout is a file on disk, and a line of it that is not the record
+    # shape would otherwise end the scan of every other candidate.
+    if not isinstance(meta, dict) or not isinstance(meta.get("payload"), dict):
+        return "", ""
+    payload = meta["payload"]
     session_id = payload.get("session_id") or ""
     if not isinstance(session_id, str) or not UUID_RE.fullmatch(session_id):
         return "", ""
