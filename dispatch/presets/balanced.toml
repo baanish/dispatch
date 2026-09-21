@@ -56,7 +56,7 @@ genius = "fable@high"
 # One line per slot, printed by `dispatch board`. This is what an orchestrating
 # agent routes by, so write it as a rule rather than as a description.
 [board.when]
-light = "bulk mechanical work; the only slot a depth-1 worker may spawn"
+light = "bulk mechanical work; a depth-1 worker may spawn this lane key at any effort"
 medium = "the default: a well-scoped task with a clear deliverable"
 high = "work meant to be merged, or whose shape outlives the task"
 blindspot = "review by a vendor that does not share the others' blind spots"

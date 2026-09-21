@@ -20,5 +20,5 @@ the first launch.
   <message>`, ask a finished one for more with `dispatch continue <id>
   <message>`, and stop one with `dispatch kill <id>`.
 - Caps are 4 live workers per session and 16 per machine, and a worker you spawn
-  runs one rung down the depth ladder: at depth 1 only the `light` slot, at
-  depth 2 nothing. Never work around either.
+  runs one rung down the depth ladder: at depth 1 only the `light` slot's lane
+  key, at any effort, and at depth 2 nothing. Never work around either.

@@ -146,7 +146,7 @@ A **slot** is a role, and the board has five. Each names the lane that plays it:
 
 | Slot | What it is for |
 | --- | --- |
-| `light` | Bulk mechanical work, and all a depth-1 worker may spawn. |
+| `light` | Bulk mechanical work. A depth-1 worker may spawn this slot's lane key, at any effort. |
 | `medium` | The default worker: well-scoped execution and investigation. |
 | `high` | Work meant to be merged, or whose shape outlives the task. |
 | `blindspot` | Adversarial review and second opinions. |
@@ -294,7 +294,7 @@ session = 4                     # live workers from one orchestrating session
 default_deadline = "30m"        # check-in interval when --deadline is absent
 human_hand_timeout = "30m"      # wait at a dialog only a human can answer; "forever" allowed
 blank_metered_keys = false      # blank the driver's API-key variables, keeping a subscription lane on its subscription
-depth1_lanes = []               # default: the lane key in the `light` slot
+depth1_lanes = ["astra"]        # lane keys, each at any effort; omit to take the `light` slot's key
 
 [lanes.astra]                   # a [lanes] table replaces the built-in set wholesale
 driver = "codex"                # codex, claude, or grok; required
@@ -344,7 +344,7 @@ a spawned worker inherits.
 | Check-in interval | `30m` | `[policy] default_deadline`, or `--deadline` per run |
 | Wait at a dialog only a human can answer | `30m` | `[policy] human_hand_timeout`, `forever` allowed |
 | Metered key blanking | off | `[policy] blank_metered_keys = true` |
-| Lanes a depth-1 worker may spawn | the `light` slot | `[policy] depth1_lanes` |
+| Lanes a depth-1 worker may spawn | the `light` slot's lane key, at any effort | `[policy] depth1_lanes` |
 | Ladder ceiling | depth 2, which spawns nothing | fixed |
 
 A deadline is when a run gets checked on, not when it dies. At each interval the
@@ -355,7 +355,8 @@ runtime.
 
 The depth ladder is enforced against the environment rather than a config file.
 A worker inherits `AGENT_DEPTH` from whatever spawned it, a depth-1 worker may
-spawn only the `light` slot, and a depth-2 worker may spawn nothing. An
+spawn any effort or tier of the `light` slot's lane key unless `[policy]
+depth1_lanes` names other keys, and a depth-2 worker may spawn nothing. An
 unreadable marker is refused rather than guessed at.
 
 ## Exit codes

@@ -161,8 +161,9 @@ spent its deadline, or never started.
   names the runs holding the slots. Finish one or kill one; never work around
   the accounting.
 - **Depth ladder**: `AGENT_DEPTH` puts a worker one rung below whoever spawned
-  it. At depth 1 only the `light` slot may be spawned, and at depth 2 nothing
-  may. Do the work yourself instead of editing the marker.
+  it. At depth 1 only the `light` slot's lane key may be spawned, at any effort
+  or tier it offers, and at depth 2 nothing may. Do the work yourself instead of
+  editing the marker.
 - **One worker, one deliverable.** Run workers yourself and carry each result
   into the next brief rather than having one worker spawn the next.
 - **A deadline is a check-in, not a runtime cap.** A worker still showing

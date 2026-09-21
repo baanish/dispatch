@@ -344,8 +344,9 @@ split is why a test can validate a config without running on it, and why
 Config lanes replace the built-in table wholesale rather than merging into it,
 so what `dispatch lanes` prints is exactly what the file says. Two values are
 read off the board instead of being kept twice: the default lane is the `medium`
-slot unless a file names one, and the lanes a depth-1 worker may spawn are the
-`light` slot unless `[policy] depth1_lanes` names them.
+slot unless a file names one, and the lane keys a depth-1 worker may spawn are
+the `light` slot's key unless `[policy] depth1_lanes` names others. The check is
+on the key, so any effort or tier of an allowed lane passes it.
 
 Every validation error names the key and the file, in that order, because the
 operator is looking at that file when the message arrives.

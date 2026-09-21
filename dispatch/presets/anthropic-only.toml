@@ -5,7 +5,8 @@
 #
 # The light slot runs the same model as the default one, at the cheapest effort
 # it offers: there is no small model here, so bulk work is bought at the same
-# rate and the depth ladder is what keeps it bounded.
+# rate. The depth ladder bounds how many rungs deep the work goes, not which
+# effort of that lane a depth-1 worker may spawn.
 
 [general]
 default_lane = "opus@medium"
@@ -28,7 +29,7 @@ blindspot = "fable@high"
 genius = "fable@high"
 
 [board.when]
-light = "bulk mechanical work; the only slot a depth-1 worker may spawn"
+light = "bulk mechanical work; a depth-1 worker may spawn this lane key at any effort"
 medium = "the default: a well-scoped task with a clear deliverable"
 high = "work meant to be merged, or whose shape outlives the task"
 blindspot = "a second read from the other model here; same vendor, same blind spots"

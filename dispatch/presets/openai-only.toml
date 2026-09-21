@@ -42,7 +42,7 @@ blindspot = "sol@high"
 genius = "astra@xhigh"
 
 [board.when]
-light = "bulk mechanical work; the only slot a depth-1 worker may spawn"
+light = "bulk mechanical work; a depth-1 worker may spawn this lane key at any effort"
 medium = "the default: a well-scoped task with a clear deliverable"
 high = "work meant to be merged, or whose shape outlives the task"
 blindspot = "a different model, same vendor: missed branches, not missed assumptions"

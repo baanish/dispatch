@@ -25,7 +25,8 @@ SLOTS = ("light", "medium", "high", "blindspot", "genius")
 # What each slot is for, in the words an agent routes by. A per-slot note in
 # config replaces the line for that slot; these are what an unnoted board says.
 SLOT_PURPOSE = {
-    "light": "bulk mechanical work, and all a depth-1 worker may spawn",
+    "light": "bulk mechanical work; a depth-1 worker may spawn this lane key "
+             "at any effort",
     "medium": "the default worker: well-scoped execution and investigation",
     "high": "work meant to be merged, or whose shape outlives the task",
     "blindspot": "adversarial review and second opinions",
