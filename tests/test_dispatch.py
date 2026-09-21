@@ -3501,7 +3501,7 @@ class TestTrustDialog(HerdrStubTestCase):
         pane.blocked = True
         original = herdr.HerdrSubstrate.blocked_rule
         herdr.HerdrSubstrate.blocked_rule = (
-            lambda self, worker, known=(): "some_other_rule")
+            lambda self, worker: "some_other_rule")
         self.addCleanup(setattr, herdr.HerdrSubstrate, "blocked_rule", original)
         self.assertFalse(wrapper.answer_blocking_dialog())
         self.assertEqual(self.stub.trust_answers, [])
@@ -3580,6 +3580,27 @@ class TestHandBackDialog(HerdrStubTestCase):
         self.addCleanup(setattr, herdr.HerdrSubstrate, "explain_agent", original)
         self.assertEqual(herdr.HerdrSubstrate().blocked_rule("any"),
                          "live_blocked_form")
+
+    def test_a_rule_that_was_only_evaluated_answers_nothing(self):
+        """An explanation with no rule that fired still lists the ones that did
+        not. Taking a name from there answers a dialog nobody matched, with the
+        keystroke the rule that did not fire would have taken."""
+        rec = self.make_live_record(backend="codex", lane="sol@medium")
+        wrapper = runner.RunWrapper(herdr.HerdrSubstrate(), rec)
+        wrapper.attach()
+        pane = self.stub.panes[rec["worker_id"]]
+        pane.agent_name = runner.run_agent_name(rec, self.substrate())
+        pane.blocked = True
+        payload = {"state": "blocked",
+                   "evaluated_rules": [
+                       {"id": drivers.get_driver("codex").dialog_rules.answered_rules[0],
+                        "matched": False}]}
+        original = herdr.HerdrSubstrate.explain_agent
+        herdr.HerdrSubstrate.explain_agent = lambda self, worker: payload
+        self.addCleanup(setattr, herdr.HerdrSubstrate, "explain_agent", original)
+        self.assertEqual(wrapper.blocked_rule(), "")
+        self.assertFalse(wrapper.answer_blocking_dialog())
+        self.assertEqual(self.stub.trust_answers, [])
 
     def test_a_foreground_run_waits_for_the_hand_and_then_finishes(self):
         """Somebody is at the keyboard, so it waits: no timeout, no answer."""

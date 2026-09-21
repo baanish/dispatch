@@ -169,7 +169,7 @@ failure on a machine with no herdr.
 - `status(worker) -> WorkerStatus`: the substrate's own reading. `tracked=False`
   means it has no record of this worker at all, which is different from one it
   is tracking and calls idle: an unmeasurable signal must never become a veto.
-- `screen_state(worker)`, `blocked_rule(worker, known_rules)`: detection. The
+- `screen_state(worker)`, `blocked_rule(worker)`: detection. The
   screen clock runs ahead of the status clock, which is why readiness asks the
   screen.
 - `deliver_prompt(worker, text)`: the substrate's own write channel. Raises when

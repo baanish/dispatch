@@ -915,10 +915,10 @@ class HerdrSubstrate(Substrate):
         """herdr's detection reasoning: which rule fired, and why.
 
         The payload is free-form in the bundled schema, so the rule is read from
-        `matched_rule.id`, which is where herdr actually puts it, then a `rule`
-        key, then matched against the serialized body. The body is the last
-        resort on purpose: it also contains every rule that was evaluated and
-        did not match.
+        `matched_rule.id`, which is where herdr actually puts it, and failing
+        that a `rule` key. Deliberately nothing else: the payload also lists
+        every rule that was evaluated and did not match, and a dialog dispatch
+        must not touch is named there as plainly as the one that fired.
         """
         if not worker.agent:
             return {}
@@ -933,7 +933,7 @@ class HerdrSubstrate(Substrate):
         state = explain.get("state") if isinstance(explain, dict) else ""
         return state if isinstance(state, str) else ""
 
-    def blocked_rule(self, worker, known_rules=()):
+    def blocked_rule(self, worker):
         explain = self.explain_agent(worker)
         matched = explain.get("matched_rule") if isinstance(explain, dict) else None
         if isinstance(matched, dict) and isinstance(matched.get("id"), str):
@@ -941,10 +941,6 @@ class HerdrSubstrate(Substrate):
         rule = explain.get("rule") if isinstance(explain, dict) else ""
         if isinstance(rule, str) and rule:
             return rule.split()[0]
-        blob = json.dumps(explain, default=str)
-        for known in known_rules:
-            if known in blob:
-                return known
         return ""
 
     # -- the agent channel -----------------------------------------------

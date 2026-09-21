@@ -201,7 +201,7 @@ class TestDetection(FakeTmuxTestCase):
     def test_nothing_here_names_a_dialog_or_tracks_an_agent(self):
         """Both readings stay "no opinion", which the runner reads as no veto."""
         substrate, worker = self.open_worker()
-        self.assertEqual(substrate.blocked_rule(worker, ("trust_directory",)), "")
+        self.assertEqual(substrate.blocked_rule(worker), "")
         self.assertEqual(substrate.screen_state(worker), "")
         self.assertFalse(substrate.status(worker).tracked)
 

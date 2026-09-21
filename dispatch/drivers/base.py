@@ -69,10 +69,6 @@ class DialogRules:
     trust_attempts: int = 0
     screen_marker: str = ""
 
-    def blocked_rules(self):
-        """Every rule exempt from a check-in kill: both classes."""
-        return tuple(self.answered_rules) + tuple(self.handback_rules)
-
 
 class Driver:
     """One vendor CLI, as everything else in dispatch needs to see it."""

@@ -1129,8 +1129,7 @@ class RunWrapper:
         return self.substrate.screen_state(self.worker) == "blocked"
 
     def blocked_rule(self):
-        return self.substrate.blocked_rule(
-            self.worker, self.driver.dialog_rules.blocked_rules())
+        return self.substrate.blocked_rule(self.worker)
 
     def answer_blocking_dialog(self):
         """Answer the one dialog dispatch is allowed to answer, or report it.

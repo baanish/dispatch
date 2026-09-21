@@ -266,11 +266,12 @@ class Substrate:
         """
         return ""
 
-    def blocked_rule(self, worker, known_rules=()):
+    def blocked_rule(self, worker):
         """The name of the detection rule blocking this worker, or empty.
 
-        `known_rules` is the driver's own list, for a substrate whose detection
-        reports a rule by shape rather than by name.
+        Only a rule the substrate reports as the one that fired. Empty is the
+        honest answer for a substrate that cannot name it, and it is what keeps
+        dispatch from typing at a dialog it cannot read.
         """
         return ""
 

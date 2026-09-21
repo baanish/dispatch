@@ -473,7 +473,7 @@ class TmuxSubstrate(Substrate):
         since = anchor_after(screen, f"{ENV_MARKER}-{token}=") if token else None
         return screen if since is None else since
 
-    def blocked_rule(self, worker, known_rules=()):
+    def blocked_rule(self, worker):
         """Always empty: no rule engine here can name the dialog on a screen.
 
         Empty is what keeps dispatch from typing at a dialog it cannot read. The
