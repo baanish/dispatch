@@ -190,6 +190,25 @@ class TestTransportSelfHeal(HerdrTestCase):
         self.assertTrue(worker.id)
         self.assertEqual(len(self.spawns), 1)
 
+    def test_a_repaired_daemon_is_pinned_again_before_the_retry(self):
+        """The daemon that answers a repair is a different process, and may be a
+        different version, so the retry must not go out on the old pin."""
+        client = self.client()
+        client.check_protocol()
+        self.stub.server_down = True
+
+        def come_back_drifted():
+            self.stub.server_down = False
+            self.stub.protocol = herdr.PROTOCOL + 1
+
+        self.fake_spawn(come_back_drifted)
+        with self.assertRaises(herdr.HerdrError) as caught:
+            client.call("pane.send_text", {})
+        self.assertIn("protocol drift", str(caught.exception))
+        # One attempt reached the daemon on its way down; a second would be the
+        # one the drifted daemon answered.
+        self.assertEqual(self.methods().count("pane.send_text"), 1)
+
     def test_the_repair_and_the_retry_are_in_the_runs_log(self):
         self.stub.server_down = True
         self.fake_spawn(lambda: setattr(self.stub, "server_down", False))

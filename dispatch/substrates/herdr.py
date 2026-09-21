@@ -559,6 +559,10 @@ class HerdrClient:
                 f"{exc}; dispatch started `{' '.join(SPAWN_ARGV)}` and it "
                 f"did not answer on {self.socket_path} within "
                 f"{SPAWN_WAIT_SECONDS}s")
+        # What answers now is a different process, so the pin the dead daemon
+        # earned says nothing about it and is taken again before the retry.
+        self.protocol = None
+        self.check_protocol()
 
     def wait_for_daemon(self):
         """Poll the endpoint until a ping comes back, bounded. True if it did."""
