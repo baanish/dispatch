@@ -2334,6 +2334,24 @@ class TestAbort(HerdrStubTestCase):
         self.assertEqual(rec["state"], "failed")
         self.assertIn("schema not satisfied", rec["error"])
 
+    def test_a_refusal_in_a_schema_run_is_not_asked_for_again_as_json(self):
+        self.stub.reply = "ABORT: this needs production credentials"
+        code = self.run_cli("run", str(self.brief), "--schema", str(self.schema_file()))
+        self.assertEqual(code, cli.EXIT_ABORTED)
+        self.assertEqual(self.only_record()["state"], "aborted")
+        self.assertEqual(
+            [p for p in self.stub.prompts if "does not satisfy the contract" in p], [])
+
+    def test_the_repair_count_survives_a_new_process_adopting_the_run(self):
+        """It lived on the wrapper, so every adoption after a watcher died was
+        another first round."""
+        self.stub.reply = "never json"
+        self.run_cli("run", str(self.brief), "--schema", str(self.schema_file()))
+        rec = self.only_record()
+        self.assertEqual(rec["schema_repairs"], runner.SCHEMA_REPAIR_ROUNDS)
+        adopted = runner.RunWrapper(herdr.HerdrSubstrate(), rec)
+        self.assertFalse(adopted.request_schema_repair())
+
     def test_bad_json_is_never_published_as_done_first(self):
         """The verdict used to land after the terminal record, so a waiter could
         read `done` and exit 0 in between, and a reconciled run kept it."""

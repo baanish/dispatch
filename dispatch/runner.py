@@ -709,7 +709,6 @@ class RunWrapper:
         self._exit_sent_at = 0.0
         self._exit_attempts = 0
         self._exit_forced = False
-        self._repairs = 0
         self._ready_screen = None
         self._ready_since = 0.0
         self._trust_answered_at = 0.0
@@ -2217,18 +2216,36 @@ class RunWrapper:
 
     def request_schema_repair(self):
         """Ask a finished worker to fix its own output. True when it was asked."""
-        if not self.rec.get("schema") or self._repairs >= SCHEMA_REPAIR_ROUNDS:
+        # Counted on the record, not on this wrapper: a run adopted by a new
+        # process after its watcher died would otherwise start the count again,
+        # and every adoption was another "round 1".
+        repairs = int(self.rec.get("schema_repairs") or 0)
+        if not self.rec.get("schema") or repairs >= SCHEMA_REPAIR_ROUNDS:
+            return False
+        if self.refused_the_brief():
+            # A refusal is an answer. Asking for it again as JSON re-prompts a
+            # worker that has already said it will not do the work.
             return False
         error = schema_error(self.rec)
         if not error:
             return False
-        self._repairs += 1
+        self.rec["schema_repairs"] = repairs + 1
+        save_record(self.rec)
         append_status(self.status_path,
-                      f"SCHEMA-REPAIR {utc_now()} round {self._repairs}: {error}")
+                      f"SCHEMA-REPAIR {utc_now()} round {repairs + 1}: {error}")
         message = prompt_text.repair_prompt(worker_path(self.rec, "out.json"), error)
         with contextlib.suppress(SubstrateError):
             self.prompt_worker(message)
         return True
+
+    def refused_the_brief(self):
+        """Did the worker write the abort marker where its answer goes?"""
+        for name in ("out.json", "out.md"):
+            with contextlib.suppress(OSError):
+                text = (self.dir / name).read_text(encoding="utf-8", errors="replace")
+                if text.strip().startswith(ABORT_MARKER):
+                    return True
+        return False
 
     def send_exit_command(self):
         """Type the driver's own exit command, the way anything is typed at a TUI.
