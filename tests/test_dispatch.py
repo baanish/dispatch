@@ -2200,6 +2200,30 @@ class TestKill(HerdrStubTestCase):
                 with records.runs_lock():
                     self.fail("entered the critical section without the lock")
 
+    def test_a_retried_finalization_does_not_take_its_own_salvage_for_an_answer(self):
+        """The first attempt died after copying the screen into out.md. Asked of
+        the file again, "did the worker write it" is yes, and the run was done."""
+        rec = self.make_live_record()
+        directory = Path(rec["dir"])
+        (directory / "screen.log").write_text("error: not logged in\n",
+                                              encoding="utf-8")
+        self.assertIs(runner.note_deliverable(rec), False)
+        runner.finalize_output(rec)                 # the salvage, then a crash
+        self.assertTrue((directory / "out.md").stat().st_size)
+
+        retried = records.load_record(rec["id"])
+        self.assertIs(runner.note_deliverable(retried), False)
+
+    def test_a_killed_run_says_whether_the_worker_had_answered(self):
+        rec = self.make_live_record()
+        rec_id = rec["id"]
+        self.stub.panes[rec["worker_id"]].running = True
+        self.stub.panes[rec["worker_id"]].turn_polls = 10_000
+        self.assertEqual(self.run_cli("kill", rec_id), cli.EXIT_OK)
+        self.assertIs(records.load_record(rec_id)["deliverable_written"], False)
+        _, report = self.capture_stdout("wait", rec_id)
+        self.assertIn("-- out.md: no answer --", report)
+
     def test_a_stale_writer_cannot_change_how_a_run_ended(self):
         """A watcher mid-poll still holds `running` after `kill` wrote `killed`,
         and a late finalizer still holds its own verdict after `done` landed."""

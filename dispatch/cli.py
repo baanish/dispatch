@@ -36,13 +36,14 @@ from .processes import stop_pid
 from .prompt import steer_prompt
 from .records import (COMPLETE_MARKER, RunOptions, all_records, append_status,
                       hold_run_lock, last_heartbeat_age, load_record, read_output,
-                      read_status_head, read_tail_bytes, read_text,
+                      read_status_head, read_tail_bytes, read_text, replace_text,
                       release_run_lock, runs_lock, runs_root, sanitize_log_line,
                       save_record,
                       stamp_epoch, utc_now, validate_run_id)
 from .runner import (STEER_INTERRUPT_SECONDS, RunWrapper, SubstrateSweep,
                      checkin_count, execute_run, finalize_output,
-                     judge_liveness, prepare_run, reconcile_run, record_worker,
+                     judge_liveness, note_deliverable, prepare_run, reconcile_run,
+                     record_worker,
                      refresh_session_id, run_agent_name, start_run_background,
                      warn_metered_key)
 from .substrates import detect_substrate, get_substrate
@@ -618,10 +619,11 @@ def cmd_kill(args):
         # orphans them.
         substrate.kill_worker_tree(worker)
         with contextlib.suppress(SubstrateError, OSError):
-            (Path(rec["dir"]) / "screen.log").write_text(
-                substrate.read_screen(worker), encoding="utf-8")
+            replace_text(Path(rec["dir"]) / "screen.log",
+                         substrate.read_screen(worker))
         substrate.close(worker, release=False)
     rec = load_record(rec["id"])
+    note_deliverable(rec)
     rec["state"] = "killed"
     rec["finished"] = utc_now()
     rec["closed_by"] = "kill"

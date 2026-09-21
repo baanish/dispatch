@@ -567,6 +567,22 @@ def finalize_schema(rec):
     return rec
 
 
+def note_deliverable(rec):
+    """Did the worker write its answer? Asked once, and saved before any salvage.
+
+    The salvage puts dispatch's copy of the last screen into out.md, so the
+    question cannot be asked of the file afterwards. A finalization that died
+    after the salvage and was retried used to find that copy, take it for the
+    worker's answer, and publish the run as done. On the record, it also lets a
+    reader tell an answer from a salvaged screen.
+    """
+    if "deliverable_written" not in rec:
+        path = deliverable_path(rec)
+        rec["deliverable_written"] = path.is_file() and path.stat().st_size > 0
+        save_record(rec)
+    return rec["deliverable_written"]
+
+
 def finalize_output(rec):
     """Leave out.md holding the deliverable, whatever the worker actually wrote.
 
@@ -2352,10 +2368,7 @@ class RunWrapper:
         # Asked before the salvage, because the salvage is what makes a worker
         # that wrote nothing look like one that wrote something.
         deliverable = deliverable_path(self.rec)
-        wrote_deliverable = deliverable.is_file() and deliverable.stat().st_size > 0
-        # On the record, so a reader can tell the worker's answer from the copy
-        # of its screen that the salvage leaves in out.md.
-        self.rec["deliverable_written"] = wrote_deliverable
+        wrote_deliverable = note_deliverable(self.rec)
         finalize_output(self.rec)
         # Only when we do not already know it: a CLI handed a session id at spawn
         # makes that value the fact and the screen merely a report of it.
