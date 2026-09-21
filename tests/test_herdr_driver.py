@@ -15,8 +15,11 @@ import dataclasses
 import io
 import json
 import os
+import socket
 import subprocess
 import sys
+import tempfile
+import threading
 import time
 import unittest
 import uuid
@@ -445,6 +448,73 @@ class TestPaneLifecycle(HerdrTestCase):
         self.stub.errors["pane.close"] = ERRORS["invalid_request"]
         with self.assertRaises(herdr.HerdrCallError):
             self.substrate().close(self.worker, release=False)
+
+
+class TricklingEndpoint:
+    """A socket that answers slowly and never ends the line.
+
+    What a wedged daemon looks like from here, and what anything else that took
+    the socket path can do on purpose: it sends `chunks` pieces a `pause`
+    apart, then holds the connection open with nothing more to say.
+    """
+
+    def __init__(self, path, chunk=b'{"id":', pause=0.05, chunks=60):
+        self.address = str(path)
+        self.chunk, self.pause, self.chunks = chunk, pause, chunks
+        self.listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.listener.bind(self.address)
+        self.listener.listen(1)
+        self.stop = threading.Event()
+        self.thread = threading.Thread(target=self._serve, daemon=True)
+        self.thread.start()
+
+    def _serve(self):
+        with contextlib.suppress(OSError):
+            connection, _ = self.listener.accept()
+            with connection:
+                for _ in range(self.chunks):
+                    if self.stop.is_set():
+                        return
+                    connection.sendall(self.chunk)
+                    time.sleep(self.pause)
+                self.stop.wait(10)
+
+    def close(self):
+        self.stop.set()
+        with contextlib.suppress(OSError):
+            self.listener.close()
+
+
+@unittest.skipUnless(hasattr(socket, "AF_UNIX"), "the unix transport needs AF_UNIX")
+class TestReplyBounds(unittest.TestCase):
+    """What answers on that socket path is not necessarily herdr."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.path = Path(self.tmp.name) / "herdr.sock"
+
+    def endpoint(self, **kwargs):
+        made = TricklingEndpoint(self.path, **kwargs)
+        self.addCleanup(made.close)
+        return made
+
+    def test_a_reply_that_trickles_in_ends_at_the_calls_own_deadline(self):
+        """A socket timeout bounds one recv and a slow sender renews it on
+        every one, so the call itself never had a bound."""
+        self.endpoint()
+        started = time.monotonic()
+        with self.assertRaises(herdr.HerdrError):
+            herdr.UnixTransport(self.path, timeout=0.2).request(b'{"id": "1"}\n')
+        self.assertLess(time.monotonic() - started, 1.0)
+
+    def test_a_reply_with_no_end_to_it_is_not_read_into_memory(self):
+        self.addCleanup(setattr, herdr, "MAX_REPLY_BYTES", herdr.MAX_REPLY_BYTES)
+        herdr.MAX_REPLY_BYTES = 1 << 16
+        self.endpoint(chunk=b"x" * 4096, pause=0, chunks=1000)
+        with self.assertRaises(herdr.HerdrError) as caught:
+            herdr.UnixTransport(self.path, timeout=5).request(b'{"id": "1"}\n')
+        self.assertIn("without ending the line", str(caught.exception))
 
 
 class TestPromptDetection(unittest.TestCase):

@@ -66,6 +66,10 @@ WINDOWS_PIPE_BROKEN = 109                # ERROR_BROKEN_PIPE: the daemon hung up
 WINDOWS_PIPE_DENIED = 5
 
 CALL_TIMEOUT = 20.0        # one socket call; `agent.start` passes its own
+# A reply is one line of JSON: a screen is the largest of them and herdr caps
+# what it will send. Past this, whatever holds the socket path is feeding this
+# process rather than answering it.
+MAX_REPLY_BYTES = 8 * 1024 * 1024
 SOURCE = "dispatch"        # report_agent source: outside herdr's allowlist
 LABEL_PREFIX = "dispatch-"  # every workspace dispatch creates is labelled
 
@@ -328,8 +332,10 @@ class UnixTransport:
             raise HerdrError(
                 f"this platform has no AF_UNIX, so {self.address} cannot be a "
                 "socket; transport_for should have chosen a pipe here")
+        seconds = self.timeout if timeout is None else timeout
+        deadline = time.monotonic() + seconds
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        sock.settimeout(self.timeout if timeout is None else timeout)
+        sock.settimeout(seconds)
         try:
             sock.connect(self.address)
         except OSError as exc:
@@ -342,15 +348,38 @@ class UnixTransport:
                     missing_daemon_message(self.address, exc)) from exc
             raise HerdrError(missing_daemon_message(self.address, exc)) from exc
         try:
-            stream = sock.makefile("rwb")
-            try:
-                stream.write(payload)
-                stream.flush()
-                return stream.readline()
-            finally:
-                stream.close()
+            sock.sendall(payload)
+            return self._read_reply(sock, deadline, seconds)
         finally:
             sock.close()
+
+    def _read_reply(self, sock, deadline, seconds):
+        """One line back, inside one deadline and one size.
+
+        A socket timeout bounds a single recv, and something answering a byte
+        at a time renews it on every one: the budget that means anything is the
+        caller's, and it covers connecting, sending, and being answered.
+        """
+        wedged = (f"herdr did not finish answering on {self.address} within "
+                  f"{seconds}s; the daemon may be wedged")
+        reply = bytearray()
+        while not reply.endswith(b"\n"):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise HerdrError(wedged)
+            sock.settimeout(remaining)
+            try:
+                chunk = sock.recv(65536)
+            except TimeoutError as exc:
+                raise HerdrError(wedged) from exc
+            if not chunk:                  # the daemon hung up, as it does
+                break
+            reply += chunk
+            if len(reply) > MAX_REPLY_BYTES:
+                raise HerdrError(
+                    f"herdr sent more than {MAX_REPLY_BYTES} bytes on "
+                    f"{self.address} without ending the line")
+        return bytes(reply)
 
 
 class PipeTransport:
@@ -381,6 +410,14 @@ class PipeTransport:
             handle.flush()
             line = bytearray()
             while not line.endswith(b"\n"):
+                if time.monotonic() > deadline:
+                    raise HerdrError(
+                        f"herdr did not finish answering on {self.address} "
+                        "before the call's deadline")
+                if len(line) > MAX_REPLY_BYTES:
+                    raise HerdrError(
+                        f"herdr sent more than {MAX_REPLY_BYTES} bytes on "
+                        f"{self.address} without ending the line")
                 try:
                     chunk = handle.read(65536)
                 except OSError as exc:
@@ -422,7 +459,7 @@ class PipeTransport:
                                  "r+b", buffering=0)
             code = ctypes.GetLastError()
             if code == WINDOWS_PIPE_BUSY:
-                if time.time() < deadline:
+                if time.monotonic() < deadline:
                     time.sleep(0.05)
                     continue
                 raise HerdrError(
@@ -437,7 +474,7 @@ class PipeTransport:
 
     def request(self, payload, timeout=None):
         seconds = self.timeout if timeout is None else timeout
-        deadline = time.time() + seconds
+        deadline = time.monotonic() + seconds
         answer = {}
 
         def exchange():
