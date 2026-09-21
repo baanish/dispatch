@@ -552,7 +552,9 @@ def cmd_status(args):
                      "-" if age is None else f"{age}s", note))
     width = max(len(row[0]) for row in rows)
     for row in rows:
-        print(f"{row[0]:<{width}}  {row[1]:<16} {row[2]:<9} hb {row[3]}{row[4]}")
+        # Through `show`: the lane column is read from a status.log a worker can
+        # write in, and so is part of the note.
+        show(f"{row[0]:<{width}}  {row[1]:<16} {row[2]:<9} hb {row[3]}{row[4]}\n")
     return EXIT_OK
 
 
