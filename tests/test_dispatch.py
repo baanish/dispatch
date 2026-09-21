@@ -2013,8 +2013,9 @@ class TestSessionCapture(HerdrStubTestCase):
         self.assertEqual(runner.refresh_session_id(rec), mine)
         self.assertTrue(rec["session_id_confirmed"])
 
-    def test_a_session_matched_only_by_directory_is_marked_as_inferred(self):
-        """Still the best guess available, and worth saying out loud."""
+    def test_a_session_matched_only_by_directory_is_noted_and_not_handed_back(self):
+        """It is another worker's session in that checkout as often as this
+        run's, and whoever resumed it would enter that run's conversation."""
         sessions = self.rollout_dir()
         started = time.time()
         rec = self.make_live_record(backend="codex", cwd=str(self.work),
@@ -2022,11 +2023,26 @@ class TestSessionCapture(HerdrStubTestCase):
         self.write_rollout(sessions / "rollout-unknown.jsonl",
                            "99999999-8888-7777-6666-555555555555", str(self.work),
                            prompt="/elsewhere/other-run/prompt.txt")
-        self.assertEqual(runner.refresh_session_id(rec),
-                         "99999999-8888-7777-6666-555555555555")
+        self.assertEqual(runner.refresh_session_id(rec), "")
+        self.assertEqual(rec["session_id"], "99999999-8888-7777-6666-555555555555")
         self.assertFalse(rec["session_id_confirmed"])
         self.assertIn("SESSION-INFERRED",
                       (Path(rec["dir"]) / "status.log").read_text())
+
+    def test_continue_refuses_a_session_that_is_only_a_directory_match(self):
+        """Two workers in one checkout: `continue` would otherwise resume
+        whichever of them codex happened to write last."""
+        sessions = self.rollout_dir()
+        rec = self.make_live_record(backend="codex", cwd=str(self.work),
+                                    state="done", started_at=time.time())
+        self.write_rollout(sessions / "rollout-theirs.jsonl",
+                           "99999999-8888-7777-6666-555555555555", str(self.work),
+                           prompt="/elsewhere/other-run/prompt.txt")
+        code, error = self.capture_stderr("continue", rec["id"], "more")
+        self.assertEqual(code, cli.EXIT_USAGE)
+        self.assertIn("another run's prompt", error)
+        self.assertIn("start a fresh run", error.lower())
+        self.assertEqual(self.stub.starts, [])
 
     def rollout_dir(self):
         sessions = self.root / "codex" / "sessions" / time.strftime("%Y/%m/%d",

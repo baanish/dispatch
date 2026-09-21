@@ -615,8 +615,13 @@ def refresh_session_id(rec):
 
     `continue` and the schema repair rounds both need it, and a CLI that names
     its own session has none until its transcript exists on disk.
+
+    Only a session this run can be shown to own is returned. One matched by the
+    directory alone is recorded for the operator and handed to nobody: with
+    several workers in one checkout it belongs to another run as often as to
+    this one, and resuming it would carry on that run's conversation.
     """
-    if rec.get("session_id"):
+    if rec.get("session_id") and rec.get("session_id_confirmed") is not False:
         return rec["session_id"]
     driver = _driver_for_record(rec)
     if driver is None or not driver.names_own_session:
@@ -625,19 +630,18 @@ def refresh_session_id(rec):
     markers = (str(rec.get("id", "")), str(Path(rec["dir"]) / "prompt.txt"))
     session_id, transcript, confirmed = driver.capture_session(
         float(started or 0), rec.get("cwd", ""), markers)
-    if session_id:
-        rec["session_id"] = session_id
-        rec["session_id_confirmed"] = confirmed
-        if not confirmed:
-            # Named the right directory but not this run: with several workers in
-            # one repo it is the best guess available, and a guess is worth
-            # saying out loud before `continue` resumes it.
-            append_status(Path(rec["dir"]) / "status.log",
-                          f"SESSION-INFERRED {utc_now()} {session_id} "
-                          "(matched by directory, not by this run's prompt)")
+    if not session_id:
+        return ""
+    rec["session_id"] = session_id
+    rec["session_id_confirmed"] = confirmed
+    if not confirmed:
+        append_status(Path(rec["dir"]) / "status.log",
+                      f"SESSION-INFERRED {utc_now()} {session_id} "
+                      "(matched by directory, not by this run's prompt)")
+        return ""
     if transcript and not rec.get("transcript"):
         rec["transcript"] = transcript
-    return rec.get("session_id", "")
+    return session_id
 
 
 def _driver_for_record(rec):

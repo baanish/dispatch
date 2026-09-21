@@ -318,6 +318,13 @@ def cmd_continue(args):
         return continue_on_machine(rec, lane, message, args)
     session_id = refresh_session_id(rec)
     if not session_id:
+        if rec.get("session_id_confirmed") is False:
+            raise DispatchError(
+                f"{args.id} has no session of its own on record: "
+                f"{rec['session_id']} ran in the same directory but carries "
+                "another run's prompt, and resuming it would continue that "
+                "run's conversation. Start a fresh run with this one's result "
+                "carried in the brief")
         raise DispatchError(
             f"{args.id} has no captured session id; start a fresh run with the "
             "prior result carried in the brief")
