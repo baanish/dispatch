@@ -181,6 +181,14 @@ def _machines(data, path):
         if not ssh:
             raise DispatchError(f"{path}: [{where}] ssh: required, "
                                 "as `user@host` or an ssh config alias")
+        # ssh takes its destination positionally, so a leading `-` is read as an
+        # option instead of a host. No destination holds whitespace or control
+        # characters either, and both hide what a command line really says.
+        if ssh.startswith("-") or any(c.isspace() or not c.isprintable()
+                                      for c in ssh):
+            raise DispatchError(
+                f"{path}: [{where}] ssh: {ssh!r} is not a destination; give "
+                "`user@host` or an ssh config alias")
         mode = _string(table, "mode", where, path) or DISPATCH_MODE
         if mode not in MACHINE_MODES:
             raise DispatchError(

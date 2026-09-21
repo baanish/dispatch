@@ -293,6 +293,18 @@ class TestValidation(ConfigTestCase):
         message = self.message_for('[machines.workshop]\nmode = "shell"\n')
         self.assertIn("[machines.workshop] ssh: required", message)
 
+    def test_an_option_shaped_ssh_target_is_refused(self):
+        """ssh takes the destination positionally, so one starting with `-`
+        reaches it as an option and never as a host."""
+        message = self.message_for(
+            '[machines.workshop]\nssh = "-oProxyCommand=touch /tmp/pwned"\n')
+        self.assertIn("[machines.workshop] ssh", message)
+        self.assertIn("is not a destination", message)
+
+    def test_an_ssh_target_with_whitespace_in_it_is_refused(self):
+        message = self.message_for('[machines.workshop]\nssh = "a@b -v"\n')
+        self.assertIn("[machines.workshop] ssh", message)
+
     def test_local_is_not_a_name_a_machine_may_take(self):
         """`--on local` means here, so a machine answering to it is unreachable."""
         message = self.message_for('[machines.local]\nssh = "operator@box"\n')
