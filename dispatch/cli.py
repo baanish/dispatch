@@ -654,7 +654,7 @@ def cmd_kill(args):
             rec["closed_by"] = "kill"
             save_record(rec)
             append_status(Path(rec["dir"]) / "status.log", f"state: {state}")
-        print(f"{args.id} is not live ({state}); nothing to kill")
+        show(f"{args.id} is not live ({state}); nothing to kill\n")
         return EXIT_OK
     # Stop the watcher before the worker. It is the deadline owner and the
     # finalizer; leaving it alive while its worker dies lets it write `done` over
@@ -758,7 +758,7 @@ def head_lines(text, count):
 TERMINAL_CONTROLS = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")
 
 
-def show(text):
+def show(text, stream=None):
     """Print text a worker wrote, without letting it drive the terminal.
 
     An answer, a status line, or a screen can carry escape sequences, and printed
@@ -767,10 +767,11 @@ def show(text):
     newline and tab is shown as a mark instead. Redirected output is the file as
     it is, byte for byte.
     """
-    if sys.stdout.isatty():
+    stream = stream or sys.stdout
+    if stream.isatty():
         text = TERMINAL_CONTROLS.sub(
             lambda found: "\u241b" if found.group() == "\x1b" else "\ufffd", text)
-    sys.stdout.write(text)
+    stream.write(text)
 
 
 def emit_frame(lines, redraw):
@@ -1795,7 +1796,9 @@ def run_verb(argv=None):
     try:
         return args.func(args)
     except DispatchError as exc:
-        print(f"dispatch: {exc}", file=sys.stderr)
+        # Through `show` as well: an error names record fields (a state, a
+        # transcript path), and a record is a file a worker can write in.
+        show(f"dispatch: {exc}\n", sys.stderr)
         return EXIT_USAGE
     except KeyboardInterrupt:
         print("dispatch: interrupted", file=sys.stderr)

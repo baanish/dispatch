@@ -3095,6 +3095,24 @@ class TestWait(HerdrStubTestCase):
         self.assertIn("line 40\n", output)    # all of out.md, never a head of it
         self.assertIn("-- out.md (40 lines) --", output)
 
+    def test_an_error_message_cannot_drive_the_terminal_either(self):
+        """Errors quote record fields, and they go to stderr, which the stdout
+        filter never saw."""
+        class Terminal(io.StringIO):
+            def isatty(self):
+                return True
+
+        with patch.object(cli, "build_parser") as parser, \
+                contextlib.redirect_stderr(Terminal()) as terminal:
+            parser.return_value.parse_args.return_value = type("A", (), {
+                "func": staticmethod(lambda args: (_ for _ in ()).throw(
+                    errors.DispatchError("state is \x1b[2Jgone")))})()
+            with patch.object(cli, "parse_cli",
+                              return_value=parser.return_value.parse_args.return_value):
+                self.assertEqual(cli.run_verb(["status"]), cli.EXIT_USAGE)
+        self.assertNotIn("\x1b", terminal.getvalue())
+        self.assertIn("gone", terminal.getvalue())
+
     def test_an_answer_cannot_drive_the_operators_terminal(self):
         """Escape sequences in out.md clear the screen over the result or load
         the clipboard. Shown as marks on a terminal, untouched when redirected."""
