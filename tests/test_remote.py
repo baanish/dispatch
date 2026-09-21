@@ -103,6 +103,19 @@ class TestRemoteLaunch(FakeSshTestCase):
         self.assertIn(f"dispatch run astra@medium {staged_path(rec)}/brief.md --bg",
                       launch)
 
+    def test_a_home_with_a_space_in_it_is_staged_to_that_exact_path(self):
+        """scp transfers over SFTP, which takes the pathname literally, so a
+        shell-quoted path would stage the brief under a name holding quotes."""
+        self.write_config('\n[machines.roomy]\nssh = "operator@roomy"\n'
+                          'home = "~/dispatch home"\n')
+        self.launched()
+        self.assertEqual(cli.main(["run", "astra@medium", str(self.brief),
+                                   "--bg", "--on", "roomy"]), cli.EXIT_OK)
+        rec = records.all_records()[-1]
+        staged = (self.remote_root / "dispatch home" / "remote" / rec["id"]
+                  / "brief.md")
+        self.assertEqual(staged.read_text(encoding="utf-8"), "do the thing\n")
+
     def test_the_launch_is_journaled_where_the_operator_looks(self):
         run_id, _ = self.launched()
         rec = self.run_remote_bg()

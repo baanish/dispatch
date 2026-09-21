@@ -85,10 +85,11 @@ def run_ssh():
 
 
 def split_spec(spec):
+    # scp speaks SFTP, so the remote half is a literal pathname, not a shell word.
     if ":" not in spec:
         return "", spec
     host, path = spec.split(":", 1)
-    return host, shlex.split(path)[0] if path else ""
+    return host, path
 
 
 def run_scp():

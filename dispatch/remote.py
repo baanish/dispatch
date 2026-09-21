@@ -256,10 +256,16 @@ def read_command(machine, path):
 
 
 def scp_path(machine, path):
+    """The remote half of an scp argument.
+
+    scp transfers over SFTP, which takes the pathname literally: shell quotes
+    would reach the machine as quote characters in the filename. A leading `~/`
+    still lands in the home directory, because scp rewrites it to a path the
+    remote resolves from there.
+    """
     if machine.shell == "powershell":
-        # SFTP accepts drive paths, but shell quotes become literal filename bytes.
         return str(path).replace("\\", "/")
-    return quote_remote(path)
+    return str(path)
 
 
 def ssh_argv(machine, command):
