@@ -682,13 +682,15 @@ def cmd_kill(args):
     rec["finished"] = utc_now()
     rec["closed_by"] = "kill"
     finalize_output(rec)
-    # Under the runs lock, so a watcher finishing at this exact moment cannot
-    # read running, decide done, and write it over the kill afterwards.
-    from .records import save_final_record
-    save_final_record(rec)
+    # An ending already on disk stands (see `save_record`), so a watcher that
+    # finished the run a moment ago keeps its verdict, and what is reported is
+    # what the record says rather than what this command meant to write.
+    save_record(rec)
+    state = rec["state"]
     append_status(Path(rec["dir"]) / "status.log", f"KILL {utc_now()}")
-    append_status(Path(rec["dir"]) / "status.log", "state: killed")
-    print(f"{args.id} killed")
+    append_status(Path(rec["dir"]) / "status.log", f"state: {state}")
+    print(f"{args.id} killed" if state == "killed"
+          else f"{args.id} had already ended ({state}); its worker is stopped")
     return EXIT_OK
 
 

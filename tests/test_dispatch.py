@@ -2262,6 +2262,27 @@ class TestKill(HerdrStubTestCase):
         retried = records.load_record(rec["id"])
         self.assertIs(runner.note_deliverable(retried), False)
 
+    def test_kill_reports_the_ending_the_record_holds(self):
+        """The watcher can finish the run a moment before the kill lands. The
+        record keeps `done`, and the command used to say "killed" anyway."""
+        rec = self.make_live_record()
+        self.stub.panes[rec["worker_id"]].running = True
+        self.stub.panes[rec["worker_id"]].turn_polls = 10_000
+        real = cli.finalize_output
+
+        def watcher_wins(found):
+            done = records.load_record(found["id"])
+            done.update(state="done", rc=0, closed_by="runner",
+                        finished=records.utc_now())
+            records.save_record(done)
+            return real(found)
+
+        with patch.object(cli, "finalize_output", side_effect=watcher_wins):
+            code, output = self.capture_stdout("kill", rec["id"])
+        self.assertEqual(code, cli.EXIT_OK)
+        self.assertIn("had already ended (done)", output)
+        self.assertEqual(records.load_record(rec["id"])["state"], "done")
+
     def test_a_killed_run_says_whether_the_worker_had_answered(self):
         rec = self.make_live_record()
         rec_id = rec["id"]
