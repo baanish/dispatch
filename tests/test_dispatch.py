@@ -2977,7 +2977,7 @@ class TestWatch(HerdrStubTestCase):
         rec = self.unwatched_bg_run()
         self.stub.panes[rec["worker_id"]].screen += "the worker said this\n"
         code, output = self.capture_stdout("watch", rec["id"])
-        self.assertEqual(code, cli.EXIT_FAILED)   # still running, not done
+        self.assertEqual(code, cli.EXIT_OK)       # looked at, and still running
         self.assertIn("WORKER", output)
         self.assertIn(f"-- {rec['worker_id']} --", output)
         self.assertIn("the worker said this", output)
@@ -2996,6 +2996,16 @@ class TestWatch(HerdrStubTestCase):
             self.assertNotIn(method, after)
         self.assertEqual(records.load_record(rec["id"])["state"], "running")
         self.assertFalse(records.lock_is_held(Path(rec["dir"]) / "watcher.lock"))
+
+    def test_watching_a_run_that_is_still_going_is_not_a_failure(self):
+        """Exit 1 means the run failed. A live run looked at with `watch` or
+        `--deep`, which `wait` itself points at, has not."""
+        rec = self.make_live_record()
+        self.stub.panes[rec["worker_id"]].running = True
+        for argv in (("watch", rec["id"]), ("watch", rec["id"], "--deep")):
+            with self.subTest(argv=argv):
+                code, _ = self.capture_stdout(*argv)
+                self.assertEqual(code, cli.EXIT_OK)
 
     def test_watching_a_finished_run_exits_with_its_state(self):
         self.stub.rc = 1
@@ -3292,7 +3302,7 @@ class TestWatchDeep(HerdrStubTestCase):
     def test_deep_reads_a_live_claude_workers_recent_activity(self):
         rec = self.claude_run()
         code, output = self.capture_stdout("watch", rec["id"], "--deep")
-        self.assertEqual(code, cli.EXIT_FAILED)   # still running, not done
+        self.assertEqual(code, cli.EXIT_OK)       # looked at, and still running
         self.assertIn(rec["id"], output)
         self.assertIn("check-ins 0", output)
         self.assertIn("READY", output)

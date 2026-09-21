@@ -184,6 +184,18 @@ def run_exit_code(rec):
     return state_exit_code(rec.get("state", ""))
 
 
+def observed_exit_code(rec):
+    """The exit code of a command that looked at a run without waiting for it.
+
+    A run that is still going has not failed. Read as `state_exit_code` reads a
+    finished one, `watch` on a healthy live run exited 1, the code that means
+    the run failed, to every agent told to look closer with it.
+    """
+    if rec.get("state") not in policy().terminal_states:
+        return EXIT_OK
+    return state_exit_code(rec.get("state", ""))
+
+
 def split_lane_and_brief(positional):
     """`dispatch run [lane] <brief>`; the lane is recognized by its shape."""
     items = list(positional or ())
@@ -912,7 +924,7 @@ def watch_single_run(args):
                     lines += screen.splitlines()[-WATCH_SCREEN_LINES:]
         emit_frame(lines, redraw=args.follow)
         if not args.follow or rec.get("state") in policy().terminal_states:
-            return state_exit_code(rec.get("state", ""))
+            return observed_exit_code(rec)
         time.sleep(WATCH_INTERVAL_SECONDS)
 
 
@@ -1084,7 +1096,7 @@ def watch_deep_run(args):
         lines.append("-- out.md --")
         lines += out_head
     emit_frame(lines, redraw=False)
-    return state_exit_code(rec.get("state", ""))
+    return observed_exit_code(rec)
 
 
 def parse_give_up(text):
