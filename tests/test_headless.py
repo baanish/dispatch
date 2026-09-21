@@ -271,10 +271,33 @@ class TestHeadlessLiveness(HeadlessTestCase):
         from dispatch.substrates import headless
         kept = headless.launch_environment({
             "AGENT_DEPTH": "1", "DISPATCH_RUN": "r", "OPENAI_API_KEY": "",
-            "PYTHONPATH": "/tmp/planted", "PATH": "/tmp/planted", "LD_PRELOAD": "x",
-            "DISPATCH_SESSION": 7})
+            "PYTHONPATH": "/tmp/planted", "PATH": "", "HOME": "", "LD_PRELOAD": "x",
+            "DISPATCH_SESSION": 7}, blanked=("OPENAI_API_KEY",))
         self.assertEqual(kept, {"AGENT_DEPTH": "1", "DISPATCH_RUN": "r",
                                 "OPENAI_API_KEY": ""})
+
+    def test_a_status_file_written_while_the_relay_runs_ends_nothing(self):
+        """The relay writes worker.rc as its last act. One that shows up while
+        the relay is still running came from the worker, and believing it ended
+        the run and skipped the kill with the CLI still going."""
+        from dispatch.substrates import headless
+        os.environ["FAKE_CLI_SECONDS"] = "20"
+        code, output = self.capture_stdout("run", "sol@medium", str(self.brief),
+                                           "--bg")
+        self.assertEqual(code, cli.EXIT_OK)
+        rec = records.load_record(output.splitlines()[0])
+        substrate, worker = self.substrate(), self.worker_of(rec)
+        pid = substrate.read_state(worker)["pid"]
+        (substrate.home(worker) / headless.RC_FILE).write_text("0", encoding="utf-8")
+
+        self.assertFalse(substrate.process_info(worker).at_prompt)
+        self.assertEqual(self.run_cli("kill", rec["id"]), cli.EXIT_OK)
+        deadline = time.time() + 15
+        while time.time() < deadline and processes.pid_alive(pid) \
+                and not processes.pid_is_zombie(pid):
+            time.sleep(0.1)
+        self.assertTrue(not processes.pid_alive(pid) or processes.pid_is_zombie(pid),
+                        "the kill was skipped")
 
     def test_a_run_a_watcher_is_driving_is_never_swept_away(self):
         """A held watcher lock is liveness in its own right: it is held for

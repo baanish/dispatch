@@ -1677,6 +1677,8 @@ class RunWrapper:
                       "in the same home under the same run")
         self.substrate.wait_for_shell(self.worker)
         self.verify_environment()
+        self.substrate.restore_launch_state(
+            self.worker, self.rec.get("cwd") or "", run_env(self.rec["id"], self.driver))
         self.start_worker(self.rec["argv"])
         # `wait_for_hand=False` because this is inside the poll loop: a respawn
         # that walks into a dialog only a human can clear leaves the brief owed

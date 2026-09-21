@@ -73,6 +73,18 @@ def pid_alive(pid):
     return True
 
 
+def pid_is_zombie(pid):
+    """Exited and not yet reaped: `pid_alive` says yes to it, and it runs nothing."""
+    if IS_WINDOWS or not pid:
+        return False
+    try:
+        found = subprocess.run(["ps", "-o", "stat=", "-p", str(int(pid))],
+                               capture_output=True, text=True, timeout=5)
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return False
+    return found.stdout.strip().startswith("Z")
+
+
 def terminate_pid(pid):
     """Graceful stop. Windows has no SIGTERM; the group break is the analog.
 

@@ -151,6 +151,12 @@ class Substrate:
         """
         raise NotImplementedError
 
+    def restore_launch_state(self, worker, cwd, env):
+        """Re-seed whatever a relaunch reads its directory and environment from.
+
+        Nothing to do where the home is a live shell that already has both.
+        """
+
     def start_worker(self, worker, driver, argv):
         """Start the CLI in an open home. Returns a SpawnResult.
 

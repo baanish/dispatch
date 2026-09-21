@@ -49,7 +49,7 @@ import shutil
 import subprocess
 
 from ..errors import DispatchError
-from ..processes import (descendant_pids, pid_alive, popen_detached,
+from ..processes import (descendant_pids, pid_alive, pid_is_zombie, popen_detached,
                          pids_cpu_percent, resolve_python, stop_pid,
                          stop_process_group)
 from ..records import (open_append, read_tail_bytes, replace_text, run_dir,
@@ -89,16 +89,19 @@ RC_RELAY = ("import os,subprocess,sys; rc=subprocess.call(sys.argv[2:]); "
 LAUNCH_ENV_NAMES = ("AGENT_DEPTH", "DISPATCH_SESSION", "DISPATCH_RUN")
 
 
-def launch_environment(saved):
+def launch_environment(saved, blanked=()):
     """The saved launch environment, cut down to what dispatch could have put there.
 
     A respawn after a CLI self-update starts the relay again from this state, as
     the operator and outside any sandbox. A `PYTHONPATH` written into it would
-    have that relay import the worker's code, so only dispatch's own markers and
-    blanked keys (empty values, which grant nothing) are carried over.
+    have that relay import the worker's code, so only dispatch's own markers are
+    carried over, and the driver's metered keys when they are blank. An empty
+    value is not harmless under any other name: an empty `PATH` or `HOME` is a
+    different environment.
     """
     return {name: value for name, value in (saved or {}).items()
-            if isinstance(value, str) and (name in LAUNCH_ENV_NAMES or value == "")}
+            if isinstance(value, str)
+            and (name in LAUNCH_ENV_NAMES or (name in blanked and value == ""))}
 
 
 class HeadlessSubstrate(Substrate):
@@ -140,8 +143,29 @@ class HeadlessSubstrate(Substrate):
         self.save_state(worker, {"env": dict(env or {}), "cwd": str(cwd or "")})
         return worker
 
+    def restore_launch_state(self, worker, cwd, env):
+        """Put back the directory and environment a relaunch starts in.
+
+        Both sit in a state file the worker may be able to write, and the
+        directory is the sandbox root of a resumed `codex exec`, which takes no
+        `-C`. Whoever relaunches knows both from its own record.
+        """
+        state = self.read_state(worker)
+        state.update(env=dict(env or {}), cwd=str(cwd or ""))
+        self.save_state(worker, state)
+
     def exists(self, worker):
         return self.home(worker).is_dir()
+
+    def relay_stopped(self, worker, pid):
+        """Has the relay that owns `worker.rc` really gone?
+
+        The status file ends a run, and it sits where the worker can write. One
+        that appears while the relay is still running was not written by the
+        relay, which writes it as its last act: believing it ended the run, freed
+        its slot, and skipped the kill, with the CLI still going.
+        """
+        return not pid or not pid_alive(pid) or pid_is_zombie(pid)
 
     def worker_ids(self):
         """Every home whose process is still running, read off the runs tree.
@@ -160,7 +184,8 @@ class HeadlessSubstrate(Substrate):
         for home in homes:
             worker = Worker(id=home.name)
             pid = self.read_state(worker).get("pid")
-            if pid and self.read_exit_code(worker) is None and pid_alive(pid):
+            # By the relay, not by worker.rc: see `relay_stopped`.
+            if pid and not self.relay_stopped(worker, pid):
                 live.append(worker.id)
         return live
 
@@ -192,7 +217,7 @@ class HeadlessSubstrate(Substrate):
         with contextlib.suppress(OSError):
             rc_path.unlink()
         env = dict(os.environ)
-        env.update(launch_environment(state.get("env")))
+        env.update(launch_environment(state.get("env"), driver.metered_key_vars))
         # `-P`: the relay's cwd is the task directory, and without it a
         # `subprocess.py` planted there runs as the operator before the CLI starts.
         relay = [resolve_python(), "-P", "-c", RC_RELAY, str(rc_path), binary,
@@ -237,7 +262,8 @@ class HeadlessSubstrate(Substrate):
         # pid outlives its process as a zombie until whoever forked it reaps it,
         # and the process asking here is usually not that one. Liveness is the
         # backstop, for a worker killed before it could write anything down.
-        finished = self.read_exit_code(worker) is not None
+        finished = self.read_exit_code(worker) is not None \
+            and self.relay_stopped(worker, pid)
         if not pid or finished or not pid_alive(pid):
             # There is no shell to hand the foreground back to, so a worker that
             # has gone is reported the way a pane substrate reports one: at the
@@ -255,9 +281,11 @@ class HeadlessSubstrate(Substrate):
 
     def read_exit_code(self, worker, run_id="", log_path=None):
         """The process's own status, as the relay wrote it down."""
+        path = self.home(worker) / RC_FILE
         try:
-            return int((self.home(worker) / RC_FILE)
-                       .read_text(encoding="utf-8").strip())
+            if path.is_symlink():
+                return None
+            return int(path.read_text(encoding="utf-8").strip())
         except (OSError, ValueError):
             return None
 
@@ -285,7 +313,8 @@ class HeadlessSubstrate(Substrate):
 
     def kill_worker_tree(self, worker):
         pid = self.read_state(worker).get("pid")
-        if not pid or self.read_exit_code(worker) is not None:
+        if not pid or (self.read_exit_code(worker) is not None
+                       and self.relay_stopped(worker, pid)):
             # The relay wrote its status and left. Anything alive wearing that
             # pid now belongs to somebody else.
             return []
