@@ -170,6 +170,20 @@ def state_exit_code(state):
     return EXIT_FAILED
 
 
+def run_exit_code(rec):
+    """A finished run's exit code, which is not 0 while its answer is elsewhere.
+
+    A remote run can end `done` on its machine with the copy down still failing.
+    Exit 0 there tells a caller the answer is in hand when there is none to read.
+    """
+    if rec.get("state") == "done" and rec.get("mirror_pending"):
+        print(f"dispatch: {rec['id']} finished on {rec.get('machine') or 'its machine'} "
+              "but its files could not be copied down; "
+              f"`dispatch wait {rec['id']}` tries again", file=sys.stderr)
+        return EXIT_FAILED
+    return state_exit_code(rec.get("state", ""))
+
+
 def split_lane_and_brief(positional):
     """`dispatch run [lane] <brief>`; the lane is recognized by its shape."""
     items = list(positional or ())
@@ -240,7 +254,7 @@ def cmd_run(args):
             print(rec["dir"])
             return EXIT_OK
         show(read_output(rec))
-        return state_exit_code(rec["state"])
+        return run_exit_code(rec)
     else:
         remote.check_shell_options(machine, opts)
         substrate = remote.shell_substrate(machine)
@@ -405,7 +419,7 @@ def continue_on_machine(rec, lane, message, args):
         print(child["dir"])
         return EXIT_OK
     show(read_output(child))
-    return state_exit_code(child["state"])
+    return run_exit_code(child)
 
 
 def cmd_steer(args):
@@ -1208,7 +1222,7 @@ def cmd_wait(args):
     lines = wait_report(rec, status_path, WAIT_LOG_LINES)
     lines += [""] + wait_answer_section(rec) + [""] + wait_cli_section(rec)
     emit_frame(lines, redraw=False)
-    return state_exit_code(rec.get("state", ""))
+    return run_exit_code(rec)
 
 
 # --------------------------------------------------------------------------

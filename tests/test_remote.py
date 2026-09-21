@@ -6,6 +6,8 @@ placed on a machine in `dispatch` mode never touches this one's, which is what
 lets these cases run with no herdr daemon anywhere.
 """
 
+import contextlib
+import io
 import json
 import os
 import sys
@@ -350,6 +352,8 @@ class TestRemoteProxy(FakeSshTestCase):
             "stdout": f"{child_id}\n~/.dispatch/runs/{child_id}\n"}]])
         self.remote_record(child_id, state="done", rc=0,
                            finished="2026-01-01T00:00:00Z")
+        # A run that ends `done` has an answer, and it has to come down.
+        self.remote_file(f"~/.dispatch/runs/{child_id}/out.md", "the second answer\n")
         self.main_out(["steer", self.rec["id"], "one more thing"])
         self.assertEqual([c for c in self.commands() if "dispatch steer" in c], [])
         child = [r for r in records.all_records() if r["kind"] == "continue"][0]
@@ -406,6 +410,17 @@ class TestTerminalMirror(FakeSshTestCase):
         self.assertTrue(rec["mirrored"])
         self.assertEqual(self.local("out.md").read_text(encoding="utf-8"),
                          "the deliverable\n")
+
+    def test_a_done_run_whose_answer_never_arrives_is_not_exit_0(self):
+        """The machine said `done`. With nothing copied down, 0 would tell the
+        caller an answer is in hand."""
+        with patch.object(remote, "scp_down", return_value=False), \
+                patch.object(remote, "MIRROR_RETRIES", 1), \
+                patch.object(cli, "REMOTE_FOLLOW_SECONDS", 0.05), \
+                contextlib.redirect_stderr(io.StringIO()) as err:
+            code = cli.main(["wait", self.rec["id"]])
+        self.assertEqual(code, cli.EXIT_FAILED)
+        self.assertIn("could not be copied down", err.getvalue())
 
     def test_wait_holds_until_the_answer_has_come_down(self):
         """The machine said `done` but the copy failed: a waiter that returned
