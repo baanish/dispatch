@@ -51,6 +51,10 @@ HEARTBEAT_SECONDS = 15
 # How long a command waits for runs.lock before refusing to go on without it.
 RUNS_LOCK_SECONDS = 120
 
+# A record is a few kilobytes. The cap exists because every command reads every
+# run's record, and a worker can make its own as long as it likes.
+RECORD_BYTE_LIMIT = 1 << 20
+
 # A worker that refuses its brief writes this first. Terminal and distinct from
 # failure: nothing retries it.
 ABORT_MARKER = "ABORT:"
@@ -220,10 +224,38 @@ def replace_bytes(path, data):
     atomic_replace(tmp, path)
 
 
+def open_regular_fd(path, flags):
+    """Open a leaf of a run directory, or refuse it. Never blocks, never follows.
+
+    A worker writes in here too, so any name it holds may have become a symlink
+    aimed out of the tree, a FIFO whose open never returns, or a second hard
+    link to a file of the operator's that an append would then extend. Neither
+    flag exists on Windows, which has no filesystem FIFOs and no unprivileged
+    symlinks; the fstat is what holds on every platform.
+    """
+    flags |= getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    fd = os.open(path, flags, 0o666)
+    try:
+        found = os.fstat(fd)
+        writing = bool(flags & (os.O_WRONLY | os.O_RDWR))
+        if not stat.S_ISREG(found.st_mode) or (writing and found.st_nlink > 1):
+            raise DispatchError(f"not a plain file of its own: {path}")
+    except BaseException:
+        os.close(fd)
+        raise
+    return fd
+
+
+def read_regular_bytes(path, limit):
+    """The first `limit` bytes of a plain file in a run directory."""
+    with os.fdopen(open_regular_fd(path, os.O_RDONLY), "rb") as handle:
+        return handle.read(limit)
+
+
 def open_append(path):
     """Open a log in a run directory for appending bytes, never through a link."""
-    flags = os.O_WRONLY | os.O_APPEND | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
-    return os.fdopen(os.open(path, flags, 0o666), "ab")
+    return os.fdopen(
+        open_regular_fd(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT), "ab")
 
 
 def out_copy_path(out):
@@ -318,6 +350,14 @@ STEER_TURN_FIELDS = ("steered", "steers", "stale_deliverable", "prompt_state_seq
 OUTCOME_FIELDS = ("state", "rc", "finished", "closed_by", "error")
 
 
+def steer_count(rec):
+    """How many turns `steer` has opened. Zero for anything that is not a count."""
+    try:
+        return int(rec.get("steers") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
 def keep_the_ending_on_disk(rec, path):
     """Once a run has ended on disk, no later write changes how it ended.
 
@@ -332,10 +372,12 @@ def keep_the_ending_on_disk(rec, path):
     from .policy import policy
 
     try:
-        on_disk = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+        on_disk = json.loads(read_regular_bytes(path, RECORD_BYTE_LIMIT))
+    except (OSError, ValueError, DispatchError):
         return
-    if int(on_disk.get("steers") or 0) > int(rec.get("steers") or 0):
+    if type(on_disk) is not dict:
+        return
+    if steer_count(on_disk) > steer_count(rec):
         # The same staleness at the start of a turn: `steer` runs in its own
         # process, and the watcher's next save would put the old turn back.
         for field in STEER_TURN_FIELDS:
@@ -370,7 +412,7 @@ def save_heartbeat(rec):
     with runs_lock():
         try:
             on_disk = bind_record_location(
-                json.loads(path.read_text(encoding="utf-8")), rec["id"])
+                json.loads(read_regular_bytes(path, RECORD_BYTE_LIMIT)), rec["id"])
         except (OSError, ValueError, DispatchError):
             on_disk = dict(rec)
         on_disk["heartbeat"] = stamp
@@ -383,7 +425,8 @@ def all_records():
     for entry in sorted(runs_root().glob("*/run.json")):
         try:
             out.append(bind_record_location(
-                json.loads(entry.read_text(encoding="utf-8")), entry.parent.name))
+                json.loads(read_regular_bytes(entry, RECORD_BYTE_LIMIT)),
+                entry.parent.name))
         except (OSError, ValueError, DispatchError):
             continue
     return out
@@ -428,7 +471,12 @@ def lock_handle(path, blocking):
     """Take an exclusive advisory lock, or return None if someone else holds it."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    handle = open(path, "a+b")
+    try:
+        handle = os.fdopen(open_regular_fd(path, os.O_RDWR | os.O_CREAT), "r+b")
+    except (OSError, DispatchError):
+        # Unopenable reads as held rather than as free: a lock file that is not
+        # a lock file must not let a second process drive the same run.
+        return None
     try:
         if IS_WINDOWS:
             import msvcrt
@@ -566,10 +614,9 @@ def write_status_header(status_path, lane_name, pid, cwd, argv, started):
 
 
 def append_status(status_path, line):
-    # Never through a link: a worker that can write in its run directory could
-    # otherwise aim this append at a file of the operator's.
-    flags = os.O_WRONLY | os.O_APPEND | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
-    with os.fdopen(os.open(status_path, flags, 0o666), "a", encoding="utf-8") as fh:
+    with os.fdopen(open_regular_fd(status_path,
+                                   os.O_WRONLY | os.O_APPEND | os.O_CREAT),
+                   "a", encoding="utf-8") as fh:
         fh.write(sanitize_log_line(line) + "\n")
 
 

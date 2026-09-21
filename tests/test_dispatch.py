@@ -2686,6 +2686,77 @@ class TestRecordLocation(HerdrStubTestCase):
                                    .read_text(encoding="utf-8"))["heartbeat"])
 
 
+class TestRunArtifactOpens(HerdrStubTestCase):
+    """One run's leaves must not stall or abort the bookkeeping every run shares."""
+
+    def plant_record(self, run_id, body=None):
+        directory = records.runs_root() / run_id
+        directory.mkdir(parents=True, exist_ok=True)
+        if body is not None:
+            (directory / "run.json").write_text(body, encoding="utf-8")
+        return directory
+
+    @unittest.skipIf(processes.IS_WINDOWS, "no filesystem FIFOs on Windows")
+    def test_a_pipe_in_place_of_a_record_is_refused_not_waited_on(self):
+        """The sweep reads every record with the runs lock held, so one read
+        that never returns stops every other run's reservation."""
+        os.mkfifo(self.plant_record("fifo-000000-aaaa") / "run.json")
+        self.plant_record("good-000000-bbbb", json.dumps({"state": "done"}))
+        self.assertEqual([rec["id"] for rec in records.all_records()],
+                         ["good-000000-bbbb"])
+
+    def test_a_record_too_large_to_be_one_is_skipped(self):
+        """Every command reads every record, so no run may size that read."""
+        self.plant_record("huge-000000-aaaa",
+                          json.dumps({"pad": "x" * records.RECORD_BYTE_LIMIT}))
+        self.plant_record("good-000000-bbbb", json.dumps({"state": "done"}))
+        self.assertEqual([rec["id"] for rec in records.all_records()],
+                         ["good-000000-bbbb"])
+
+    @unittest.skipIf(processes.IS_WINDOWS, "unprivileged symlinks are POSIX-only")
+    def test_a_lock_file_that_is_a_link_is_not_opened_through(self):
+        """Opening a dangling lock symlink for append creates its target."""
+        lock = self.plant_record("link-000000-aaaa") / "owner.lock"
+        outside = self.work / "not-a-lock"
+        lock.symlink_to(outside)
+        self.assertIsNone(records.lock_handle(lock, blocking=False))
+        self.assertFalse(outside.exists())
+
+    @unittest.skipIf(processes.IS_WINDOWS, "no FIFOs and no hard links to test")
+    def test_an_append_refuses_a_pipe_or_a_second_link_to_another_file(self):
+        """A FIFO blocks the append; a hard link makes it extend the other file."""
+        directory = self.plant_record("logs-000000-aaaa")
+        os.mkfifo(directory / "fifo.log")
+        elsewhere = self.work / "operators.txt"
+        elsewhere.write_text("theirs\n", encoding="utf-8")
+        os.link(elsewhere, directory / "linked.log")
+        # A FIFO with nobody reading it is refused by the open itself; the fstat
+        # is what catches the rest. Either way the append never blocks.
+        refused = (errors.DispatchError, OSError)
+        for name in ("fifo.log", "linked.log"):
+            with self.subTest(name=name):
+                with self.assertRaises(refused):
+                    records.append_status(directory / name, "HEARTBEAT")
+                with self.assertRaises(refused):
+                    records.open_append(directory / name)
+        self.assertEqual(elsewhere.read_text(encoding="utf-8"), "theirs\n")
+
+    def test_the_fallback_answer_is_a_bounded_tail_of_the_screen(self):
+        """A worker with no deliverable sizes that read, and the screen is its
+        own output."""
+        directory = self.plant_record("tail-000000-aaaa",
+                                      json.dumps({"state": "running"}))
+        (directory / "screen.log").write_text("o" * 20000 + "the end\n",
+                                              encoding="utf-8")
+        rec = records.load_record("tail-000000-aaaa")
+        with patch.object(Path, "read_text", side_effect=AssertionError(
+                "the screen must not be read whole")):
+            runner.finalize_output(rec)
+        answer = (directory / "out.md").read_text(encoding="utf-8")
+        self.assertTrue(answer.endswith("the end\n"))
+        self.assertLessEqual(len(answer.encode("utf-8")), 8000)
+
+
 class TestLogTail(unittest.TestCase):
     def read_tail(self, data, count, meaningful=False):
         reads = []

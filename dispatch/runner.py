@@ -44,7 +44,8 @@ from .processes import popen_detached, resolve_python
 from .records import (ABORT_MARKER, HEARTBEAT_SECONDS, STEER_TURN_FIELDS,
                       append_status,
                       deliverable_path, hold_run_lock, new_run_id, out_copy_dir,
-                      out_copy_path, read_output, release_run_lock, replace_text,
+                      out_copy_path, read_output, read_tail_bytes,
+                      release_run_lock, replace_text,
                       run_dir, save_final_record, save_heartbeat, save_record,
                       open_append, utc_now, validate_session_id, write_out_copy,
                       write_status_header)
@@ -605,8 +606,7 @@ def finalize_output(rec):
         return
     screen_log = directory / "screen.log"
     if screen_log.is_file() and screen_log.stat().st_size:
-        blob = screen_log.read_text(encoding="utf-8", errors="replace")
-        replace_text(out_path, blob[-8000:])
+        replace_text(out_path, read_tail_bytes(screen_log, 8000))
         return
     replace_text(out_path, "")
 
