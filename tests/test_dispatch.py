@@ -2164,6 +2164,15 @@ class TestKill(HerdrStubTestCase):
         self.assertEqual(records.load_record(rec["id"])["state"], "orphaned")
         self.assertEqual(self.stub.closed, [])
 
+    def test_the_runs_lock_is_never_entered_without_being_taken(self):
+        """A failed acquire used to fall through, so two commands could count
+        the same free slot. It waits, and then it refuses."""
+        with patch.object(records, "lock_handle", return_value=None), \
+                patch.object(records, "RUNS_LOCK_SECONDS", 0.2):
+            with self.assertRaises(errors.DispatchError):
+                with records.runs_lock():
+                    self.fail("entered the critical section without the lock")
+
     def test_kill_writes_its_terminal_state_under_the_runs_lock(self):
         """A watcher finishing at the same moment reads, decides, then writes.
 

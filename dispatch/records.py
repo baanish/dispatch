@@ -48,6 +48,9 @@ RECORD_REPLACE_SECONDS = 5.0
 # The pace the run loop writes heartbeats at.
 HEARTBEAT_SECONDS = 15
 
+# How long a command waits for runs.lock before refusing to go on without it.
+RUNS_LOCK_SECONDS = 120
+
 # A worker that refuses its brief writes this first. Terminal and distinct from
 # failure: nothing retries it.
 ABORT_MARKER = "ABORT:"
@@ -431,7 +434,18 @@ def runs_lock():
         return
     home = dispatch_home()
     home.mkdir(parents=True, exist_ok=True)
+    # Never entered without the lock. A blocking acquire still comes back empty:
+    # Windows gives up after ten one-second tries, and a holder can be inside a
+    # reconcile for longer than that.
+    give_up = time.time() + RUNS_LOCK_SECONDS
     handle = lock_handle(home / "runs.lock", blocking=True)
+    while handle is None:
+        if time.time() >= give_up:
+            raise DispatchError(
+                f"could not take {home / 'runs.lock'} in {RUNS_LOCK_SECONDS}s; "
+                "refusing to count or change runs without it")
+        time.sleep(0.1)
+        handle = lock_handle(home / "runs.lock", blocking=True)
     _runs_lock_owner, _runs_lock_depth = me, 1
     try:
         yield
