@@ -2612,6 +2612,43 @@ class TestOrchestration(HerdrStubTestCase):
 # --------------------------------------------------------------------------
 
 
+class TestProcessIdentifiers(unittest.TestCase):
+    """A pid comes off a record a worker can write, and lands in `os.kill`."""
+
+    # -1 is every process the operator may signal, 0 and anything below -1 is a
+    # process group, 1 is init, and the rest coerce to one of those through
+    # `int()`.
+    NOT_PIDS = (-1, 0, "0", "-1", "4242", 1, True, 1.5, None, [4242])
+
+    def test_a_selector_that_is_not_a_process_is_never_signalled(self):
+        for value in self.NOT_PIDS:
+            with self.subTest(value=value), \
+                    patch.object(processes.os, "kill") as kill, \
+                    patch.object(processes.os, "killpg") as killpg, \
+                    patch.object(processes.subprocess, "run") as run:
+                self.assertFalse(processes.pid_alive(value))
+                self.assertFalse(processes.pid_is_zombie(value))
+                processes.terminate_pid(value)
+                processes.kill_pid(value)
+                processes.stop_pid(value)
+                self.assertFalse(processes.stop_process_group(value))
+                self.assertIsNone(processes.process_cpu_percent(value))
+                self.assertIsNone(processes.pids_cpu_percent([value]))
+                kill.assert_not_called()
+                killpg.assert_not_called()
+                run.assert_not_called()
+
+    def test_a_selector_that_is_not_a_process_descends_from_nothing(self):
+        """`True` indexes the parent table at 1, whose descendants are signalled."""
+        with patch.object(processes, "posix_process_parents",
+                          return_value=[(1, 0), (4242, 1)]), \
+                patch.object(processes, "windows_process_parents",
+                             return_value=[(1, 0), (4242, 1)]):
+            for value in self.NOT_PIDS:
+                with self.subTest(value=value):
+                    self.assertEqual(processes.descendant_pids([value]), [])
+
+
 class TestLogTail(unittest.TestCase):
     def read_tail(self, data, count, meaningful=False):
         reads = []

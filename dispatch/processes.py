@@ -29,6 +29,24 @@ DETACHED_FLAGS = DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_BREAKAWAY_
 # SIGTERM, then SIGKILL after this long.
 KILL_GRACE_SECONDS = 10
 
+# The widest a process id can be: pid_t is signed on POSIX, a DWORD on Windows.
+MAX_PID = 0xFFFFFFFF if IS_WINDOWS else 0x7FFFFFFF
+
+
+def checked_pid(pid):
+    """One real process, or None. Every query and every signal goes through here.
+
+    Most pids here come back off a record a worker can write, and `os.kill` reads
+    the whole integer line as targets rather than as ids: 0 is the caller's own
+    process group, anything below -1 is some other group, and -1 is every process
+    the operator may signal. 1 is init. A bool is an int in Python, and a digit
+    string coerces to any of those, so the type is checked as narrowly as the
+    range.
+    """
+    if type(pid) is not int or not 1 < pid <= MAX_PID:
+        return None
+    return pid
+
 
 def popen_detached(argv, **kwargs):
     """Start `argv` outside this process's lifetime, and outside its job where allowed.
@@ -47,7 +65,8 @@ def popen_detached(argv, **kwargs):
 
 
 def pid_alive(pid):
-    if not pid:
+    pid = checked_pid(pid)
+    if pid is None:
         return False
     if IS_WINDOWS:
         import ctypes
@@ -55,7 +74,7 @@ def pid_alive(pid):
         PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
         STILL_ACTIVE = 259
         handle = ctypes.windll.kernel32.OpenProcess(
-            PROCESS_QUERY_LIMITED_INFORMATION, False, int(pid))
+            PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
         if not handle:
             return False
         code = ctypes.c_ulong()
@@ -63,24 +82,25 @@ def pid_alive(pid):
         ctypes.windll.kernel32.CloseHandle(handle)
         return bool(ok) and code.value == STILL_ACTIVE
     try:
-        os.kill(int(pid), 0)
+        os.kill(pid, 0)
     except ProcessLookupError:
         return False
     except PermissionError:
         return True
-    except (OSError, ValueError):
+    except OSError:
         return False
     return True
 
 
 def pid_is_zombie(pid):
     """Exited and not yet reaped: `pid_alive` says yes to it, and it runs nothing."""
-    if IS_WINDOWS or not pid:
+    pid = checked_pid(pid)
+    if IS_WINDOWS or pid is None:
         return False
     try:
-        found = subprocess.run(["ps", "-o", "stat=", "-p", str(int(pid))],
+        found = subprocess.run(["ps", "-o", "stat=", "-p", str(pid)],
                                capture_output=True, text=True, timeout=5)
-    except (OSError, ValueError, subprocess.SubprocessError):
+    except (OSError, subprocess.SubprocessError):
         return False
     return found.stdout.strip().startswith("Z")
 
@@ -94,16 +114,22 @@ def terminate_pid(pid):
     than failing quietly, so that one is left to `kill_pid`'s taskkill on the
     caller's next pass.
     """
+    pid = checked_pid(pid)
+    if pid is None:
+        return
     try:
         if IS_WINDOWS:
-            os.kill(int(pid), signal.CTRL_BREAK_EVENT)
+            os.kill(pid, signal.CTRL_BREAK_EVENT)
         else:
-            os.kill(int(pid), signal.SIGTERM)
-    except (OSError, ValueError, AttributeError, SystemError):
+            os.kill(pid, signal.SIGTERM)
+    except (OSError, AttributeError, SystemError):
         pass
 
 
 def kill_pid(pid):
+    pid = checked_pid(pid)
+    if pid is None:
+        return
     try:
         if IS_WINDOWS:
             subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)],
@@ -111,8 +137,8 @@ def kill_pid(pid):
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                            check=False)
         else:
-            os.kill(int(pid), signal.SIGKILL)
-    except (OSError, ValueError):
+            os.kill(pid, signal.SIGKILL)
+    except OSError:
         pass
 
 
@@ -191,11 +217,14 @@ def windows_process_parents():
 
 def descendant_pids(pids):
     """Every process descended from these, by walking ppid links once."""
+    # `True` would otherwise index the table at 1 and return the whole orphan
+    # population of the machine, which the callers go on to signal.
+    roots = [pid for pid in map(checked_pid, pids) if pid is not None]
     children = {}
     for child, parent in (windows_process_parents() if IS_WINDOWS
                           else posix_process_parents()):
         children.setdefault(parent, []).append(child)
-    found, queue, seen = [], list(pids), set(pids)
+    found, queue, seen = [], list(roots), set(roots)
     while queue:
         for child in children.get(queue.pop(), ()):
             if child not in seen:
@@ -207,21 +236,22 @@ def descendant_pids(pids):
 
 def stop_process_group(pgid):
     """SIGTERM then SIGKILL a whole foreground group. False where unsupported."""
-    if IS_WINDOWS or not hasattr(os, "killpg"):
+    pgid = checked_pid(pgid)
+    if IS_WINDOWS or pgid is None or not hasattr(os, "killpg"):
         return False
     try:
-        os.killpg(int(pgid), signal.SIGTERM)
-    except (OSError, ValueError):
+        os.killpg(pgid, signal.SIGTERM)
+    except OSError:
         return False
     deadline = time.time() + KILL_GRACE_SECONDS
     while time.time() < deadline:
         try:
-            os.killpg(int(pgid), 0)
+            os.killpg(pgid, 0)
         except OSError:
             return True
         time.sleep(0.2)
     try:
-        os.killpg(int(pgid), signal.SIGKILL)
+        os.killpg(pgid, signal.SIGKILL)
     except OSError:
         pass
     return True
@@ -235,13 +265,14 @@ def process_cpu_percent(pid):
     samples and a sleep inside the poll loop). The liveness judge degrades to
     output activity there rather than paying that on every look.
     """
-    if IS_WINDOWS or not pid:
+    pid = checked_pid(pid)
+    if IS_WINDOWS or pid is None:
         return None
     try:
-        probe = subprocess.run(["ps", "-o", "%cpu=", "-p", str(int(pid))],
+        probe = subprocess.run(["ps", "-o", "%cpu=", "-p", str(pid)],
                                stdin=subprocess.DEVNULL, capture_output=True,
                                text=True, timeout=5, check=False)
-    except (OSError, subprocess.SubprocessError, ValueError):
+    except (OSError, subprocess.SubprocessError):
         return None
     try:
         return float((probe.stdout or "").strip().splitlines()[0])
