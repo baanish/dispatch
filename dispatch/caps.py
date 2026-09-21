@@ -139,9 +139,14 @@ def run_is_live(rec, worker_ids=None):
     worker_id = rec.get("worker_id")
     if worker_id and worker_ids is not None:
         return worker_id in worker_ids
-    # The substrate is unreachable, or there is no worker yet. Falling through to
-    # the lock and the reservation keeps the caps conservative.
-    if lock_is_held(Path(rec.get("dir", "")) / "owner.lock"):
+    # The substrate is unreachable, nobody asked it, or there is no worker yet.
+    # A held lock is a live process driving the run, the launcher's or the
+    # watcher's. Without the watcher's, a healthy background run read as finished
+    # once its reservation aged out, and `steer` and `continue` opened a second
+    # turn on a session that was still working.
+    directory = Path(rec.get("dir", ""))
+    if lock_is_held(directory / "owner.lock") \
+            or lock_is_held(directory / "watcher.lock"):
         return True
     return reserved_recently(rec)
 

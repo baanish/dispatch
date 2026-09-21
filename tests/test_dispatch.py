@@ -2164,6 +2164,18 @@ class TestKill(HerdrStubTestCase):
         self.assertEqual(records.load_record(rec["id"])["state"], "orphaned")
         self.assertEqual(self.stub.closed, [])
 
+    def test_a_watched_background_run_is_live_after_its_reservation_ages_out(self):
+        """The launcher has let go of owner.lock by then, and `steer` and
+        `continue` ask without a worker list: only the watcher's lock says the
+        run is still going, and without it they resumed a working session."""
+        rec = self.make_live_record()
+        rec["reserved_at"] = time.time() - 3600
+        records.save_record(rec)
+        self.assertFalse(caps.run_is_live(rec))
+        handle = records.hold_run_lock(rec, "watcher.lock")
+        self.addCleanup(records.release_run_lock, handle)
+        self.assertTrue(caps.run_is_live(rec))
+
     def test_the_runs_lock_is_never_entered_without_being_taken(self):
         """A failed acquire used to fall through, so two commands could count
         the same free slot. It waits, and then it refuses."""
