@@ -530,6 +530,11 @@ def cmd_steer(args):
     rec["deliverable_since"] = 0.0
     save_record(rec)
     wrapper.prompt_worker(steer_prompt(message))
+    # Counted again once the prompt is in. The watcher takes up each count once,
+    # and a look that landed between the save above and the stamps the prompt
+    # writes (its state sequence, the turn count) would keep the old ones.
+    rec["steers"] += 1
+    save_record(rec)
     append_status(status_path, f"STEER {utc_now()} delivered")
     print(f"{args.id} steered")
     return EXIT_OK

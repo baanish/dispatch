@@ -2113,7 +2113,7 @@ class RunWrapper:
         # Through JSON, so a list: a tuple would come back unequal to itself
         # after one save-and-load round trip.
         signature = [stat.st_size, stat.st_mtime]
-        if signature == list(self.rec.get("stale_deliverable") or []):
+        if self.deliverable_is_stale():
             # The answer from before a steer, untouched since. The new turn has
             # written nothing yet, however long this file has been quiet.
             return self.forget_deliverable()
@@ -2127,6 +2127,17 @@ class RunWrapper:
         except (TypeError, ValueError):
             return self.forget_deliverable()
         return (time.time() - since) >= DELIVERABLE_QUIET_SECONDS
+
+    def deliverable_is_stale(self):
+        """Is the file on disk still the answer from before a steer, untouched?"""
+        stale = self.rec.get("stale_deliverable")
+        if not stale:
+            return False
+        try:
+            found = deliverable_path(self.rec).stat()
+        except OSError:
+            return False
+        return [found.st_size, found.st_mtime] == list(stale)
 
     def forget_deliverable(self):
         """Drop a recorded sighting, for a deliverable that is gone or empty."""
@@ -2282,7 +2293,10 @@ class RunWrapper:
         if not self.turn_end_is_settled():
             self._second_look_due = True
             return False
-        if not self.deliverable_landed():
+        if not self.deliverable_landed() or self.deliverable_is_stale():
+            # Nothing written, or only the answer from before a steer: either
+            # way this turn has produced no answer, and ending the run here
+            # would hand back the one the steer was correcting.
             self.note_turn_without_deliverable()
             return False
         if self.request_schema_repair():

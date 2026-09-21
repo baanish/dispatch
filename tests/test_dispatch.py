@@ -2352,6 +2352,29 @@ class TestKill(HerdrStubTestCase):
         self.assertTrue(watcher.absorb_steer())
         self.assertEqual(watcher.rec["turn_over_at"], "")
 
+    def test_a_tracked_turn_ending_on_the_old_answer_does_not_end_the_run(self):
+        """Where the substrate reports the agent done, the quiet-file check is
+        never asked, so the old answer has to be refused at the shared gate."""
+        rec = self.make_live_record()
+        out = Path(rec["dir"]) / "out.md"
+        out.write_text("the first answer", encoding="utf-8")
+        found = out.stat()
+        rec["stale_deliverable"] = [found.st_size, found.st_mtime]
+        records.save_record(rec)
+        watcher = runner.RunWrapper(herdr.HerdrSubstrate(), rec)
+        watcher.attach()
+        sent = []
+        with patch.object(watcher, "turn_is_over", return_value=True), \
+                patch.object(watcher, "turn_end_is_settled", return_value=True), \
+                patch.object(watcher, "note_turn_without_deliverable"), \
+                patch.object(watcher, "send_exit_command",
+                             side_effect=lambda: sent.append(1) or True):
+            self.assertFalse(watcher.end_session_if_done())
+            self.assertEqual(sent, [])
+            out.write_text("the corrected answer", encoding="utf-8")
+            os.utime(out, (found.st_atime + 5, found.st_mtime + 5))
+            self.assertTrue(watcher.end_session_if_done())
+
     def test_the_answer_from_before_a_steer_cannot_end_the_new_turn(self):
         rec = self.make_live_record()
         out = Path(rec["dir"]) / "out.md"
