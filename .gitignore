@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+dist/
+*.egg-info/
+build/
+
+# Local design notes, not part of the package.
+PLAN.md

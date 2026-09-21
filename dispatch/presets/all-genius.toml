@@ -1,0 +1,30 @@
+# all-genius: one lane, the most capable one, in every slot.
+#
+# Assumes `claude` is installed and logged in. Run `dispatch doctor` to check.
+#
+# This is the board to reach for when the work matters more than the bill, and
+# the wrong one to leave installed: every mechanical subtask, every second
+# opinion, and every depth-1 spawn bills at the top rate. `dispatch init
+# --preset balanced --force` puts the cheaper roles back.
+
+[general]
+default_lane = "fable@high"
+
+[lanes.fable]
+driver = "claude"
+model = "claude-fable-5-1"
+efforts = ["high"]
+
+[board]
+light = "fable@high"
+medium = "fable@high"
+high = "fable@high"
+blindspot = "fable@high"
+genius = "fable@high"
+
+[board.when]
+light = "bulk mechanical work, at the top rate"
+medium = "the default: a well-scoped task with a clear deliverable"
+high = "work meant to be merged, or whose shape outlives the task"
+blindspot = "a second read from the same model: it shares the first read's blind spots"
+genius = "the one call worth the highest price"

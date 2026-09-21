@@ -1,0 +1,49 @@
+# openai-only: every slot on codex.
+#
+# Assumes `codex` is installed and logged in, and nothing else is. Run
+# `dispatch doctor` to check.
+#
+# The blindspot slot is the compromise here: a second opinion from the same
+# vendor shares the first one's blind spots, so it catches missed branches and
+# not missed assumptions. Add a lane on another vendor when you have one.
+
+[general]
+default_lane = "astra@medium"
+
+[lanes.luna]
+driver = "codex"
+model = "gpt-5.6-luna"
+efforts = ["high", "xhigh", "max"]
+tier = "priority"
+alt_tiers = ["default", "priority"]
+tier_aliases = { fast = "priority" }
+
+[lanes.sol]
+driver = "codex"
+model = "gpt-5.6-sol"
+efforts = ["medium", "high", "xhigh", "max"]
+tier = "default"
+alt_tiers = ["default", "priority"]
+tier_aliases = { fast = "priority" }
+
+[lanes.astra]
+driver = "codex"
+model = "gpt-6-astra"
+efforts = ["medium", "high", "xhigh"]
+tier = "default"
+alt_tiers = ["default", "priority"]
+tier_aliases = { fast = "priority" }
+
+[board]
+light = "luna@high"
+medium = "astra@medium"
+high = "astra@high"
+blindspot = "sol@high"
+genius = "astra@xhigh"
+
+[board.when]
+light = "bulk mechanical work; the only slot a depth-1 worker may spawn"
+medium = "the default: a well-scoped task with a clear deliverable"
+high = "work meant to be merged, or whose shape outlives the task"
+blindspot = "a different model, same vendor: missed branches, not missed assumptions"
+genius = "the one call worth the highest price; never a volume lane"

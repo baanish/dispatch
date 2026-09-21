@@ -1,0 +1,35 @@
+# anthropic-only: every slot on claude.
+#
+# Assumes `claude` is installed and logged in, and nothing else is. Run
+# `dispatch doctor` to check.
+#
+# The light slot runs the same model as the default one, at the cheapest effort
+# it offers: there is no small model here, so bulk work is bought at the same
+# rate and the depth ladder is what keeps it bounded.
+
+[general]
+default_lane = "opus@medium"
+
+[lanes.opus]
+driver = "claude"
+model = "claude-opus-5"
+efforts = ["medium", "high"]
+
+[lanes.fable]
+driver = "claude"
+model = "claude-fable-5-1"
+efforts = ["high"]
+
+[board]
+light = "opus@medium"
+medium = "opus@medium"
+high = "opus@high"
+blindspot = "fable@high"
+genius = "fable@high"
+
+[board.when]
+light = "bulk mechanical work; the only slot a depth-1 worker may spawn"
+medium = "the default: a well-scoped task with a clear deliverable"
+high = "work meant to be merged, or whose shape outlives the task"
+blindspot = "a second read from the other model here; same vendor, same blind spots"
+genius = "the one call worth the highest price; never a volume lane"

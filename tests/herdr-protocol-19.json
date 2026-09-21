@@ -1,0 +1,326 @@
+{
+  "_note": "Live recordings from herdr 0.8.0, protocol 19. Ground truth for the stub daemon in tests/herdr_stub.py: every shape here came off a real socket, not from the bundled schema. Prompts and paths are generic; re-record with the substrate's own client if herdr's protocol moves.",
+  "_recorded": "2026-08-17T22:00Z herdr 0.8.0 protocol 19",
+  "_framing": "One JSON request per line, one JSON response per line, and the daemon closes the connection after every response.",
+  "results": {
+    "ping": {
+      "capabilities": {
+        "detached_server_daemon": false,
+        "live_handoff": true
+      },
+      "protocol": 19,
+      "type": "pong",
+      "version": "0.8.0"
+    },
+    "workspace.create": {
+      "root_pane": {
+        "agent_status": "unknown",
+        "cwd": "/private/tmp",
+        "focused": true,
+        "foreground_cwd": "/private/tmp",
+        "pane_id": "w3:p1",
+        "revision": 0,
+        "scroll": {
+          "max_offset_from_bottom": 0,
+          "offset_from_bottom": 0,
+          "viewport_rows": 24
+        },
+        "tab_id": "w3:t1",
+        "terminal_id": "term_6594557868bb94",
+        "workspace_id": "w3"
+      },
+      "tab": {
+        "agent_status": "unknown",
+        "focused": true,
+        "label": "1",
+        "number": 1,
+        "pane_count": 1,
+        "tab_id": "w3:t1",
+        "workspace_id": "w3"
+      },
+      "type": "workspace_created",
+      "workspace": {
+        "active_tab_id": "w3:t1",
+        "agent_status": "unknown",
+        "focused": true,
+        "label": "dispatch-test-record",
+        "number": 1,
+        "pane_count": 1,
+        "tab_count": 1,
+        "workspace_id": "w3"
+      }
+    },
+    "pane.split": {
+      "pane": {
+        "agent_status": "unknown",
+        "cwd": "/private/tmp",
+        "focused": false,
+        "foreground_cwd": "/private/tmp",
+        "pane_id": "w3:p2",
+        "revision": 0,
+        "scroll": {
+          "max_offset_from_bottom": 0,
+          "offset_from_bottom": 0,
+          "viewport_rows": 23
+        },
+        "tab_id": "w3:t1",
+        "terminal_id": "term_659455786a8695",
+        "workspace_id": "w3"
+      },
+      "type": "pane_info"
+    },
+    "pane.get": {
+      "pane": {
+        "agent_status": "unknown",
+        "cwd": "/private/tmp",
+        "focused": false,
+        "foreground_cwd": "/private/tmp",
+        "pane_id": "w3:p2",
+        "revision": 0,
+        "scroll": {
+          "max_offset_from_bottom": 0,
+          "offset_from_bottom": 0,
+          "viewport_rows": 23
+        },
+        "tab_id": "w3:t1",
+        "terminal_id": "term_659455786a8695",
+        "workspace_id": "w3"
+      },
+      "type": "pane_info"
+    },
+    "pane.get.after_report": {
+      "pane": {
+        "agent": "sol",
+        "agent_status": "working",
+        "cwd": "/private/tmp",
+        "focused": false,
+        "foreground_cwd": "/private/tmp",
+        "pane_id": "w3:p2",
+        "revision": 0,
+        "scroll": {
+          "max_offset_from_bottom": 0,
+          "offset_from_bottom": 0,
+          "viewport_rows": 23
+        },
+        "tab_id": "w3:t1",
+        "terminal_id": "term_659455786a8695",
+        "workspace_id": "w3"
+      },
+      "type": "pane_info"
+    },
+    "pane.read": {
+      "read": {
+        "format": "text",
+        "pane_id": "w3:p2",
+        "revision": 0,
+        "source": "recent_unwrapped",
+        "tab_id": "w3:t1",
+        "text": "echo dispatch-marker; sleep 8\nuser@host tmp % echo dispatch-marker; sleep 8\ndispatch-marker\nuser@host tmp %",
+        "truncated": false,
+        "workspace_id": "w3"
+      },
+      "type": "pane_read"
+    },
+    "pane.process_info.settled": {
+      "type": "pane_process_info",
+      "process_info": {
+        "foreground_process_group_id": 83374,
+        "foreground_processes": [
+          {
+            "argv": [
+              "-zsh"
+            ],
+            "argv0": "zsh",
+            "cmdline": "-zsh",
+            "cwd": "/private/tmp",
+            "name": "zsh",
+            "pid": 83374
+          }
+        ],
+        "pane_id": "w5:p1",
+        "shell_pid": 83374
+      }
+    },
+    "pane.process_info.child_running": {
+      "type": "pane_process_info",
+      "process_info": {
+        "foreground_process_group_id": 83712,
+        "foreground_processes": [
+          {
+            "argv": [
+              "sleep",
+              "3"
+            ],
+            "argv0": "sleep",
+            "cmdline": "sleep 3",
+            "cwd": "/private/tmp",
+            "name": "sleep",
+            "pid": 83713
+          },
+          {
+            "argv": [
+              "sh",
+              "-c",
+              "sleep 3; exit 7"
+            ],
+            "argv0": "sh",
+            "cmdline": "sh -c sleep 3; exit 7",
+            "cwd": "/private/tmp",
+            "name": "bash",
+            "pid": 83712
+          }
+        ],
+        "pane_id": "w5:p1",
+        "shell_pid": 83374
+      }
+    },
+    "pane.process_info.prompt_returned": {
+      "type": "pane_process_info",
+      "process_info": {
+        "foreground_process_group_id": 83374,
+        "foreground_processes": [
+          {
+            "argv": [
+              "-zsh"
+            ],
+            "argv0": "zsh",
+            "cmdline": "-zsh",
+            "cwd": "/private/tmp",
+            "name": "zsh",
+            "pid": 83374
+          }
+        ],
+        "pane_id": "w5:p1",
+        "shell_pid": 83374
+      }
+    },
+    "pane.process_info.rc_files_running": {
+      "process_info": {
+        "foreground_process_group_id": 81823,
+        "foreground_processes": [
+          {
+            "argv": [
+              "expr",
+              "v24",
+              ":",
+              "^lts/-[1-9][0-9]*$"
+            ],
+            "argv0": "expr",
+            "cmdline": "expr v24 : ^lts/-[1-9][0-9]*$",
+            "cwd": "/private/tmp",
+            "name": "expr",
+            "pid": 81983
+          },
+          {
+            "argv": [
+              "-zsh"
+            ],
+            "argv0": "zsh",
+            "cmdline": "-zsh",
+            "cwd": "/private/tmp",
+            "name": "zsh",
+            "pid": 81981
+          },
+          {
+            "argv": [
+              "-zsh"
+            ],
+            "argv0": "zsh",
+            "cmdline": "-zsh",
+            "cwd": "/private/tmp",
+            "name": "zsh",
+            "pid": 81979
+          },
+          {
+            "argv": [
+              "-zsh"
+            ],
+            "argv0": "zsh",
+            "cmdline": "-zsh",
+            "cwd": "/private/tmp",
+            "name": "zsh",
+            "pid": 81978
+          },
+          {
+            "argv": [
+              "tail",
+              "-1"
+            ],
+            "argv0": "tail",
+            "cmdline": "tail -1",
+            "cwd": "/private/tmp",
+            "name": "tail",
+            "pid": 81958
+          },
+          {
+            "argv": [
+              "-zsh"
+            ],
+            "argv0": "zsh",
+            "cmdline": "-zsh",
+            "cwd": "/private/tmp",
+            "name": "zsh",
+            "pid": 81954
+          },
+          {
+            "argv": [
+              "-zsh"
+            ],
+            "argv0": "zsh",
+            "cmdline": "-zsh",
+            "cwd": "/private/tmp",
+            "name": "zsh",
+            "pid": 81952
+          },
+          {
+            "argv": [
+              "-zsh"
+            ],
+            "argv0": "zsh",
+            "cmdline": "-zsh",
+            "cwd": "/private/tmp",
+            "name": "zsh",
+            "pid": 81879
+          },
+          {
+            "argv": [
+              "-zsh"
+            ],
+            "argv0": "zsh",
+            "cmdline": "-zsh",
+            "cwd": "/private/tmp",
+            "name": "zsh",
+            "pid": 81823
+          }
+        ],
+        "pane_id": "w3:p2",
+        "shell_pid": 81823
+      },
+      "type": "pane_process_info"
+    },
+    "ok": {
+      "type": "ok"
+    }
+  },
+  "errors": {
+    "unsupported_agent_kind": {
+      "code": "unsupported_agent_kind",
+      "message": "unsupported interactive agent kind nosuchkind"
+    },
+    "pane_not_found": {
+      "code": "pane_not_found",
+      "message": "pane w999:p999 not found"
+    },
+    "invalid_request": {
+      "code": "invalid_request",
+      "message": "invalid request: missing field `agent` at line 1 column 102"
+    },
+    "server_not_running": {
+      "code": "server_not_running",
+      "message": "no herdr server is running at /home/user/.config/herdr/herdr.sock; run `herdr` to start or attach it"
+    }
+  },
+  "screens": {
+    "rc_probe": "sh -c 'sleep 3; exit 7'\nuser@host tmp % sh -c 'sleep 3; exit 7'\nuser@host tmp % echo dispatch-rc-abc123=$?\ndispatch-rc-abc123=7\nuser@host tmp %"
+  }
+}
