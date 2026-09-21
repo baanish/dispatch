@@ -70,13 +70,20 @@ dispatch run brief.md --dir . --write
 unless your config names another.
 
 A foreground run blocks until the worker finishes, then prints the answer it
-wrote. `--bg` prints the run id instead and returns:
+wrote. `--bg` returns instead, printing the run id on its first line and the run
+directory on its second:
 
 ```
 dispatch run brief.md --dir . --write --bg
-dispatch status                     # one line per run
-dispatch wait 4f2c1a                # block, then print the answer
+# astra@medium-183640-1ed5
+# ~/.dispatch/runs/astra@medium-183640-1ed5
+
+dispatch status                                # one line per run
+dispatch wait astra@medium-183640-1ed5         # block, then print the answer
 ```
+
+Every verb that takes an id takes the whole id, the first line `--bg` printed.
+There is no short form.
 
 ### The verbs
 
