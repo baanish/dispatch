@@ -191,12 +191,23 @@ def replace_text(path, text):
     A worker writes here too, so the name may be a symlink to a file of the
     operator's by the time dispatch writes it.
     """
+    replace_bytes(path, text.encode("utf-8"))
+
+
+def replace_bytes(path, data):
+    """`replace_text` for bytes."""
     path = Path(path)
     tmp = path.with_name(f".{path.name}.{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp")
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
-    with os.fdopen(os.open(tmp, flags, 0o666), "w", encoding="utf-8") as handle:
-        handle.write(text)
+    with os.fdopen(os.open(tmp, flags, 0o666), "wb") as handle:
+        handle.write(data)
     atomic_replace(tmp, path)
+
+
+def open_append(path):
+    """Open a log in a run directory for appending bytes, never through a link."""
+    flags = os.O_WRONLY | os.O_APPEND | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+    return os.fdopen(os.open(path, flags, 0o666), "ab")
 
 
 def out_copy_path(out):
@@ -521,9 +532,8 @@ def write_status_header(status_path, lane_name, pid, cwd, argv, started):
         f"cmd: {cmd[:200]}",
         f"started: {started}",
     ]
-    with open(status_path, "a", encoding="utf-8") as fh:
-        fh.write("\n".join(lines) + "\n")
-        fh.write(f"START {started} {cmd}\n")
+    with open_append(status_path) as fh:
+        fh.write(("\n".join(lines) + f"\nSTART {started} {cmd}\n").encode("utf-8"))
 
 
 def append_status(status_path, line):

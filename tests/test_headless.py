@@ -127,6 +127,26 @@ class TestHeadlessRun(HeadlessTestCase):
         self.assertEqual(rec["state"], "done", rec.get("error"))
         self.assertEqual(rec["rc"], 0)
 
+    @unittest.skipIf(os.name == "nt", "symlinks need privileges on Windows")
+    def test_state_and_logs_in_a_run_directory_are_never_written_through_a_link(self):
+        from dispatch.substrates import headless
+        secret = records.runs_root().parent / "secret"
+        secret.write_text("mine", encoding="utf-8")
+        substrate = headless.HeadlessSubstrate()
+        worker = substrate.open("sol@medium-000000-link")
+        home = substrate.home(worker)
+        (home / headless.STATE_FILE).unlink(missing_ok=True)
+        (home / headless.STATE_FILE).symlink_to(secret)
+        substrate.save_state(worker, {"pid": 1})
+        self.assertEqual(secret.read_text(encoding="utf-8"), "mine")
+        (home / headless.PANE_LOG).unlink(missing_ok=True)
+        (home / headless.PANE_LOG).symlink_to(secret)
+        with self.assertRaises(OSError):
+            records.open_append(home / headless.PANE_LOG)
+        (home / "prompt.txt").symlink_to(secret)
+        records.replace_text(home / "prompt.txt", "a follow-up")
+        self.assertEqual(secret.read_text(encoding="utf-8"), "mine")
+
     def test_python_planted_in_the_task_directory_is_never_imported(self):
         """The relay and the watcher both start in `--dir`, as the operator and
         outside any sandbox, so its files must not shadow what they import."""

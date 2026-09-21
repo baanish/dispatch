@@ -53,7 +53,8 @@ from .caps import reserve_slot, session_key
 from .errors import DispatchError
 from .policy import current_depth, parse_deadline, policy
 from .records import (append_status, dispatch_home, new_run_id, out_copy_dir,
-                      out_copy_path, release_run_lock, run_dir, save_record,
+                      out_copy_path, release_run_lock, replace_bytes, replace_text,
+                      run_dir, save_record,
                       utc_now, validate_run_id, write_out_copy,
                       write_status_header)
 
@@ -434,7 +435,7 @@ def stage_file(rec, machine, name, text):
     path: a brief, a schema, an image, a steer message.
     """
     local = Path(rec["dir"]) / name
-    local.write_text(text, encoding="utf-8")
+    replace_text(local, text)
     scp_up(machine, [local], rec["remote_staging"])
     return posixpath.join(rec["remote_staging"], name)
 
@@ -867,7 +868,7 @@ def fetch_deliverable(rec):
         fetched = scratch.read_bytes()
         if target.is_file() and target.read_bytes() == fetched:
             return False
-        target.write_bytes(fetched)
+        replace_bytes(target, fetched)
         return True
     except (DispatchError, OSError):
         return False

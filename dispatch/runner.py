@@ -45,7 +45,7 @@ from .records import (ABORT_MARKER, HEARTBEAT_SECONDS, append_status,
                       deliverable_path, hold_run_lock, new_run_id, out_copy_dir,
                       out_copy_path, read_output, release_run_lock, replace_text,
                       run_dir, save_final_record, save_heartbeat, save_record,
-                      utc_now, validate_session_id, write_out_copy,
+                      open_append, utc_now, validate_session_id, write_out_copy,
                       write_status_header)
 from .substrates.base import SubstrateError, Worker, WorkerSetupError
 
@@ -1311,7 +1311,7 @@ class RunWrapper:
         pane is driven over: a path this machine has and that one does not is
         how a worker ends up with no brief at all.
         """
-        (self.dir / "prompt.txt").write_text(text, encoding="utf-8")
+        replace_text(self.dir / "prompt.txt", text)
         if not self.rec.get("remote_staging"):
             return str(self.dir / "prompt.txt")
         return remote.stage_file(self.rec, remote.machine_of_record(self.rec),
@@ -2530,7 +2530,7 @@ def spawn_detached_watcher(rec):
     root = str(Path(__file__).resolve().parent.parent)
     env["PYTHONPATH"] = os.pathsep.join(
         [root] + ([env["PYTHONPATH"]] if env.get("PYTHONPATH") else []))
-    log = open(directory / "watcher.log", "ab")
+    log = open_append(directory / "watcher.log")
     try:
         popen = popen_detached(
             argv, cwd=rec.get("cwd") or None, env=env,

@@ -52,7 +52,8 @@ from ..errors import DispatchError
 from ..processes import (descendant_pids, pid_alive, popen_detached,
                          pids_cpu_percent, resolve_python, stop_pid,
                          stop_process_group)
-from ..records import read_tail_bytes, run_dir, runs_root
+from ..records import (open_append, read_tail_bytes, replace_text, run_dir,
+                       runs_root)
 from .base import (Substrate, SubstrateCapabilities, SubstrateError, SpawnResult,
                    Worker, WorkerProcess)
 
@@ -123,8 +124,7 @@ class HeadlessSubstrate(Substrate):
             return {}
 
     def save_state(self, worker, state):
-        (self.home(worker) / STATE_FILE).write_text(
-            json.dumps(state, indent=2), encoding="utf-8")
+        replace_text(self.home(worker) / STATE_FILE, json.dumps(state, indent=2))
 
     def open(self, label, cwd="", env=None, focus=False):
         try:
