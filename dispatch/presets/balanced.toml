@@ -1,4 +1,6 @@
-# balanced: every slot filled by the vendor that is best at that role.
+# balanced: every slot filled by the model that is best at that role, across
+# three vendors. The opus lane is defined and fills no slot: name it when you
+# want a second Claude model.
 #
 # Assumes all three CLIs are installed and logged in: `codex`, `claude`, and
 # `grok`. Run `dispatch doctor` to check. Drop the lanes for a vendor you do
@@ -49,7 +51,7 @@ efforts = ["high"]
 [board]
 light = "luna@high"
 medium = "astra@medium"
-high = "opus@high"
+high = "astra@high"
 blindspot = "grok@high"
 genius = "fable@high"
 
