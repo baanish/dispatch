@@ -221,6 +221,29 @@ class TestHeadlessLiveness(HeadlessTestCase):
         self.assertEqual(records.load_record(rec["id"])["state"], "running")
         self.assertTrue(processes.pid_alive(worker_pid), "the CLI was killed")
 
+    def test_a_run_that_finished_after_its_watcher_died_is_collected(self):
+        """The worker wrote its answer and exited 0 with nobody watching. The
+        sweep has to read that ending, not call the run orphaned."""
+        os.environ["FAKE_CLI_SECONDS"] = "2"
+        code, output = self.capture_stdout("run", "sol@medium", str(self.brief),
+                                           "--bg")
+        self.assertEqual(code, cli.EXIT_OK)
+        rec = records.load_record(output.splitlines()[0])
+        self.stop_watcher(rec.get("watcher_pid"))
+        rec["reserved_at"] = time.time() - caps.RESERVATION_GRACE_SECONDS - 1
+        records.save_record(rec)
+        worker = self.worker_of(rec)
+        deadline = time.time() + 30
+        while time.time() < deadline and self.substrate().read_exit_code(worker) is None:
+            time.sleep(0.1)
+        self.assertEqual(self.substrate().read_exit_code(worker), 0)
+
+        caps.live_records(runner.SubstrateSweep(self.substrate()))
+
+        settled = records.load_record(rec["id"])
+        self.assertEqual(settled["state"], "done", settled.get("error"))
+        self.assertEqual(settled["rc"], 0)
+
     def test_a_run_a_watcher_is_driving_is_never_swept_away(self):
         """A held watcher lock is liveness in its own right: it is held for
         exactly as long as somebody is driving that worker."""

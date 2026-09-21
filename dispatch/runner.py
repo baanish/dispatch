@@ -2638,6 +2638,11 @@ class SubstrateSweep(Sweep):
             return reconcile_run(rec, self.substrate)
         return rec
 
+    def home_remains(self, rec):
+        with contextlib.suppress(SubstrateError, OSError):
+            return self.substrate.process_info(record_worker(rec)) is not None
+        return False
+
     def reconcile_remote(self, rec):
         return remote.reconcile_remote_run(rec)
 

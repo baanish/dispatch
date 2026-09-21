@@ -64,6 +64,10 @@ class Sweep:
         """One poll of an unwatched run. Returns the record, possibly terminal."""
         return rec
 
+    def home_remains(self, rec):
+        """Is the worker's home still there to read an ending from?"""
+        return False
+
     def reconcile_remote(self, rec):
         """One poll of an unwatched run placed on another machine."""
         return rec
@@ -249,6 +253,14 @@ def live_records(sweep=None):
                     continue
             live.append(rec)
         elif reconcile and mine:
+            if rec.get("worker_id") and sweep.home_remains(rec):
+                # Not listed is not always gone: a headless worker leaves the
+                # list when it exits, with its status written and its answer on
+                # disk. One look reads that ending instead of calling a run that
+                # finished well orphaned.
+                rec = sweep.reconcile(rec)
+                if rec.get("state") in policy().terminal_states:
+                    continue
             sweep.abandon(rec, ids)
     return live
 
