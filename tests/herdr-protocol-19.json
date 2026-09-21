@@ -1,6 +1,5 @@
 {
-  "_note": "Live recordings from herdr 0.8.0, protocol 19. Ground truth for the stub daemon in tests/herdr_stub.py: every shape here came off a real socket, not from the bundled schema. Prompts and paths are generic; re-record with the substrate's own client if herdr's protocol moves.",
-  "_recorded": "2026-08-17T22:00Z herdr 0.8.0 protocol 19",
+  "_note": "The response shapes of herdr 0.8.0, protocol 19: the field names and nesting the daemon puts on the wire, which the bundled schema does not always match. This is what the stub daemon in tests/herdr_stub.py answers with. Identifiers, pids, prompts and paths are synthetic; re-record with the substrate's own client if herdr's protocol moves.",
   "_framing": "One JSON request per line, one JSON response per line, and the daemon closes the connection after every response.",
   "results": {
     "ping": {
@@ -26,7 +25,7 @@
           "viewport_rows": 24
         },
         "tab_id": "w3:t1",
-        "terminal_id": "term_6594557868bb94",
+        "terminal_id": "term_00000000000001",
         "workspace_id": "w3"
       },
       "tab": {
@@ -64,7 +63,7 @@
           "viewport_rows": 23
         },
         "tab_id": "w3:t1",
-        "terminal_id": "term_659455786a8695",
+        "terminal_id": "term_00000000000002",
         "workspace_id": "w3"
       },
       "type": "pane_info"
@@ -83,7 +82,7 @@
           "viewport_rows": 23
         },
         "tab_id": "w3:t1",
-        "terminal_id": "term_659455786a8695",
+        "terminal_id": "term_00000000000002",
         "workspace_id": "w3"
       },
       "type": "pane_info"
@@ -103,7 +102,7 @@
           "viewport_rows": 23
         },
         "tab_id": "w3:t1",
-        "terminal_id": "term_659455786a8695",
+        "terminal_id": "term_00000000000002",
         "workspace_id": "w3"
       },
       "type": "pane_info"
@@ -124,7 +123,7 @@
     "pane.process_info.settled": {
       "type": "pane_process_info",
       "process_info": {
-        "foreground_process_group_id": 83374,
+        "foreground_process_group_id": 4010,
         "foreground_processes": [
           {
             "argv": [
@@ -134,17 +133,17 @@
             "cmdline": "-zsh",
             "cwd": "/private/tmp",
             "name": "zsh",
-            "pid": 83374
+            "pid": 4010
           }
         ],
         "pane_id": "w5:p1",
-        "shell_pid": 83374
+        "shell_pid": 4010
       }
     },
     "pane.process_info.child_running": {
       "type": "pane_process_info",
       "process_info": {
-        "foreground_process_group_id": 83712,
+        "foreground_process_group_id": 4011,
         "foreground_processes": [
           {
             "argv": [
@@ -155,7 +154,7 @@
             "cmdline": "sleep 3",
             "cwd": "/private/tmp",
             "name": "sleep",
-            "pid": 83713
+            "pid": 4012
           },
           {
             "argv": [
@@ -167,17 +166,17 @@
             "cmdline": "sh -c sleep 3; exit 7",
             "cwd": "/private/tmp",
             "name": "bash",
-            "pid": 83712
+            "pid": 4011
           }
         ],
         "pane_id": "w5:p1",
-        "shell_pid": 83374
+        "shell_pid": 4010
       }
     },
     "pane.process_info.prompt_returned": {
       "type": "pane_process_info",
       "process_info": {
-        "foreground_process_group_id": 83374,
+        "foreground_process_group_id": 4010,
         "foreground_processes": [
           {
             "argv": [
@@ -187,16 +186,16 @@
             "cmdline": "-zsh",
             "cwd": "/private/tmp",
             "name": "zsh",
-            "pid": 83374
+            "pid": 4010
           }
         ],
         "pane_id": "w5:p1",
-        "shell_pid": 83374
+        "shell_pid": 4010
       }
     },
     "pane.process_info.rc_files_running": {
       "process_info": {
-        "foreground_process_group_id": 81823,
+        "foreground_process_group_id": 4001,
         "foreground_processes": [
           {
             "argv": [
@@ -209,7 +208,7 @@
             "cmdline": "expr v24 : ^lts/-[1-9][0-9]*$",
             "cwd": "/private/tmp",
             "name": "expr",
-            "pid": 81983
+            "pid": 4009
           },
           {
             "argv": [
@@ -219,7 +218,7 @@
             "cmdline": "-zsh",
             "cwd": "/private/tmp",
             "name": "zsh",
-            "pid": 81981
+            "pid": 4008
           },
           {
             "argv": [
@@ -229,7 +228,7 @@
             "cmdline": "-zsh",
             "cwd": "/private/tmp",
             "name": "zsh",
-            "pid": 81979
+            "pid": 4007
           },
           {
             "argv": [
@@ -239,7 +238,7 @@
             "cmdline": "-zsh",
             "cwd": "/private/tmp",
             "name": "zsh",
-            "pid": 81978
+            "pid": 4006
           },
           {
             "argv": [
@@ -250,7 +249,7 @@
             "cmdline": "tail -1",
             "cwd": "/private/tmp",
             "name": "tail",
-            "pid": 81958
+            "pid": 4005
           },
           {
             "argv": [
@@ -260,7 +259,7 @@
             "cmdline": "-zsh",
             "cwd": "/private/tmp",
             "name": "zsh",
-            "pid": 81954
+            "pid": 4004
           },
           {
             "argv": [
@@ -270,7 +269,7 @@
             "cmdline": "-zsh",
             "cwd": "/private/tmp",
             "name": "zsh",
-            "pid": 81952
+            "pid": 4003
           },
           {
             "argv": [
@@ -280,7 +279,7 @@
             "cmdline": "-zsh",
             "cwd": "/private/tmp",
             "name": "zsh",
-            "pid": 81879
+            "pid": 4002
           },
           {
             "argv": [
@@ -290,11 +289,11 @@
             "cmdline": "-zsh",
             "cwd": "/private/tmp",
             "name": "zsh",
-            "pid": 81823
+            "pid": 4001
           }
         ],
         "pane_id": "w3:p2",
-        "shell_pid": 81823
+        "shell_pid": 4001
       },
       "type": "pane_process_info"
     },

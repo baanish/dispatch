@@ -719,8 +719,9 @@ class TestPaneSpawn(HerdrStubTestCase):
 
     def test_a_lost_export_line_is_reasserted(self):
         """A daemon busy with a same-second launch burst can drop the export
-        while landing the probe, which read back AGENT_DEPTH='' on the
-        smoketest. The guard re-asserts instead of refusing a healthy pane."""
+        while landing the probe, so the read-back comes home with
+        AGENT_DEPTH=''. The guard re-asserts instead of refusing a healthy
+        pane."""
         self.blank_metered_keys()
         self.stub.rc_clobbers_env = True
         self.stub.eats_exports = 1
@@ -733,9 +734,9 @@ class TestPaneSpawn(HerdrStubTestCase):
         self.assertIn("AGENT_DEPTH=1 verified", log)
 
     def test_a_pane_gone_at_birth_gets_a_fresh_workspace(self):
-        """Four same-second creates raced in the smoketest and one pane was
-        gone before its first send_keys. That is a birth failure, not a
-        refusal: recreate and carry on."""
+        """Same-second creates race, and a pane can be gone before its first
+        send_keys. That is a birth failure, not a refusal: recreate and carry
+        on."""
         self.stub.vanish_next_creates = 1
         self.assertEqual(self.run_cli("run", str(self.brief)), cli.EXIT_OK)
         rec = self.only_record()
@@ -1052,7 +1053,7 @@ class TestATurnEndIsNotARunEnd(HerdrStubTestCase):
         prompt_seq = wrapper.rec["prompt_state_seq"]
         self.set_status(pane, "done")
         self.look(wrapper)                              # one look: not an ending
-        self.set_status(pane, "working")                # his queued message
+        self.set_status(pane, "working")                # a queued message lands
         self.look(wrapper)                              # one flap is not a turn
         after = self.look(wrapper)                      # it holds: a real turn
         self.assertEqual(after["state"], "running")
@@ -1194,7 +1195,7 @@ class TestBackground(HerdrStubTestCase):
                   f"{records.load_record(rec_id).get('state')}")
 
     def test_a_bg_run_completes_with_no_further_dispatch_invocation(self):
-        """The whole point of the watcher, and rulings 5 and 6 together.
+        """The whole point of the watcher.
 
         Nothing here calls dispatch again: the detached watcher has to notice the
         turn is over, send the exit command itself, read the exit code back off
@@ -2463,7 +2464,7 @@ class TestOrchestration(HerdrStubTestCase):
         self.stub.reply = "answer"
         self.run_cli("run", str(self.brief))
         pane_log = (Path(self.only_record()["dir"]) / "screen.log").read_text()
-        self.assertIn("claude" if False else "codex", pane_log)
+        self.assertIn("codex", pane_log)
 
     def test_record_keeps_the_session_id_for_joining_the_harness_transcript(self):
         self.run_cli("run", "opus@high", str(self.brief))
@@ -2528,10 +2529,9 @@ class TestOrchestration(HerdrStubTestCase):
         self.assertTrue((Path(rec["dir"]) / "out.md").read_text().strip())
 
     def test_an_ambient_metered_key_warns_and_the_pane_still_blanks_it(self):
-        """The launcher cannot always unset an ambient key (the grok
-        smoketest), and the pane blanking with read-back is the layer that
-        actually protects the worker, so the lane launches with a loud warning
-        instead of refusing."""
+        """The launcher cannot always unset an ambient key, and the pane
+        blanking with read-back is the layer that actually protects the worker,
+        so the lane launches with a loud warning instead of refusing."""
         self.blank_metered_keys()
         os.environ["OPENAI_API_KEY"] = "sk-metered"
         code, error = self.capture_stderr("run", str(self.brief))
@@ -3233,13 +3233,14 @@ class TestPaneAfterlife(HerdrStubTestCase):
 
 
 class TestWorkerStartup(HerdrStubTestCase):
-    """Both defects the first real run through the rewired CLI surfaced."""
+    """Naming the worker: what herdr will accept, and what a run must keep."""
 
     def test_the_agent_name_is_legal_for_herdr(self):
-        """A run id is not a legal agent name; `@` failed the whole start."""
-        self.assertEqual(herdr.agent_name("sol@medium-222126-436f"),
-                         "sol-medium-222126-436f")
-        for run_id in ("sol@medium-222126-436f", "opus@high:fast-120000-ab12",
+        """A run id is not a legal agent name: the `@` in a lane fails the
+        whole start, and so does a leading digit or a name this long."""
+        self.assertEqual(herdr.agent_name("sol@medium-101500-a1b2"),
+                         "sol-medium-101500-a1b2")
+        for run_id in ("sol@medium-101500-a1b2", "opus@high:fast-120000-ab12",
                        "@@@", "x" * 60, "9-starts-with-a-digit"):
             name = herdr.agent_name(run_id)
             self.assertRegex(name, r"^[a-z][a-z0-9_-]{0,31}$", run_id)
@@ -3360,11 +3361,11 @@ class TestWorkerStartup(HerdrStubTestCase):
 
 
 class TestAgentAddressing(HerdrStubTestCase):
-    """The chain the second real run exposed, link by link."""
+    """Every agent call addresses the worker by name, link by link."""
 
     def test_agent_calls_target_the_name_not_the_pane(self):
-        """herdr answers agent_not_found for a pane id, so every prompt was
-        refused and every run fell to the typed fallback."""
+        """herdr answers agent_not_found for a pane id, so addressing a pane
+        refuses every prompt and drops the run to the typed fallback."""
         self.assertEqual(self.run_cli("run", str(self.brief)), cli.EXIT_OK)
         rec = self.only_record()
         self.assertNotIn("spawn_fallback", rec)
@@ -3581,9 +3582,9 @@ class TestHandBackDialog(HerdrStubTestCase):
                          "live_blocked_form")
 
     def test_a_foreground_run_waits_for_the_hand_and_then_finishes(self):
-        """The launcher is at his keyboard, so it waits: no timeout, no answer."""
+        """Somebody is at the keyboard, so it waits: no timeout, no answer."""
         self.stub.hand_dialog = True
-        self.stub.hand_polls = 2       # he answers it on the second look
+        self.stub.hand_polls = 2       # answered on the second look
         code, errors = self.capture_stderr("run", "opus@high", str(self.brief))
         self.assertEqual(code, cli.EXIT_OK)
         rec = self.only_record()
@@ -3654,7 +3655,7 @@ class TestHandBackDialog(HerdrStubTestCase):
         self.assertNotIn(settled.get("checkin_verdict"),
                          runner.CHECKIN_KILL_VERDICTS)
 
-    def test_status_and_the_wall_say_the_run_is_waiting_on_his_hand(self):
+    def test_status_and_the_wall_say_the_run_is_waiting_on_a_hand(self):
         rec = self.blocked_bg_run()
         _, status = self.capture_stdout("status")
         self.assertIn(f"NEEDS HAND: {drivers.get_driver('claude').dialog_rules.handback_rules[0]}", status)
@@ -3865,7 +3866,8 @@ class TestResumeIntoALiveTurn(HerdrStubTestCase):
         return child
 
     def test_a_continue_into_a_mid_turn_session_waits_instead_of_being_abandoned(self):
-        """The defect, from the other side: busy at launch is not a failed spawn."""
+        """The same rule from the other side: busy at launch is not a failed
+        spawn, so the continue waits the turn out instead of giving up."""
         parent = self.parent_run()
         self.stub.resume_turn_polls = 6     # still finishing when the pane opens
         self.assertEqual(self.run_cli("continue", parent, "one more thing"),

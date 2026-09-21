@@ -147,7 +147,7 @@ class DeniedTransport:
 
 
 class TestTransportSelfHeal(HerdrTestCase):
-    """Finding 28: start a daemon that is down, diagnose one that is not ours."""
+    """Start a daemon that is down, diagnose one that is not ours."""
 
     def setUp(self):
         super().setUp()
@@ -384,16 +384,16 @@ class TestPromptDetection(unittest.TestCase):
     def test_running_child_does_not(self):
         info = self.info("pane.process_info.child_running")
         self.assertFalse(herdr.pane_at_prompt(info))
-        self.assertEqual(sorted(herdr.pane_worker_pids(info)), [83712, 83713])
+        self.assertEqual(sorted(herdr.pane_worker_pids(info)), [4011, 4012])
 
     def test_prompt_returns_when_the_child_exits(self):
         self.assertTrue(
             herdr.pane_at_prompt(self.info("pane.process_info.prompt_returned")))
 
     def test_the_shells_own_subprocesses_are_not_a_worker(self):
-        """Recorded from a live pane: prompt hooks and rc files fork constantly,
-        all inside the shell's group. Reading those as a running worker made the
-        pane look busy forever and made kill signal the prompt's own children."""
+        """Prompt hooks and rc files fork constantly, all inside the shell's
+        own group. Read as a running worker they leave the pane looking busy
+        forever, and they put the prompt's own children in kill's way."""
         info = self.info("pane.process_info.rc_files_running")
         self.assertEqual(info["foreground_process_group_id"], info["shell_pid"])
         self.assertGreater(len(info["foreground_processes"]), 1)

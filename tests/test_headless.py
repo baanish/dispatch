@@ -222,8 +222,9 @@ class TestHeadlessLiveness(HeadlessTestCase):
         self.assertNotIn(rec["worker_id"], self.substrate().worker_ids())
 
     def test_a_background_run_outlives_its_reservation(self):
-        """The whole finding: worker, record, and cap slot all still there after
-        a sweep that used to kill the CLI and journal the run failed."""
+        """Worker, record, and cap slot are all still there after a sweep runs
+        against a background run whose reservation has expired. An expired
+        reservation is not evidence the run is gone."""
         os.environ["FAKE_CLI_SECONDS"] = "10"
         code, output = self.capture_stdout("run", "sol@medium", str(self.brief),
                                            "--bg")

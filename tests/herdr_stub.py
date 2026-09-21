@@ -107,10 +107,10 @@ CLAUDE_UPDATE_SCREEN = "\n\u2713 Update installed \u00b7 Restart to apply\n"
 class StubPane:
     """One pane: a shell, maybe an interactive worker holding it, and a screen.
 
-    The worker models what the real-CLI smoke found rather than what the brief
-    assumed: a CLI takes the foreground, finishes its turn, reports `done`, and
-    then sits there. It gives the pane back only when someone types its exit
-    command, which is the driver's job.
+    The worker models how an interactive CLI actually holds a pane: it takes the
+    foreground, finishes its turn, reports `done`, and then sits there. It gives
+    the pane back only when someone types its exit command, which is the
+    driver's job.
     """
 
     def __init__(self, pane_id, workspace_id, shell_pid):
