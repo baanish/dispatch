@@ -2649,6 +2649,43 @@ class TestProcessIdentifiers(unittest.TestCase):
                     self.assertEqual(processes.descendant_pids([value]), [])
 
 
+class TestRecordLocation(HerdrStubTestCase):
+    """A worker can write its own run.json, `id` and `dir` included."""
+
+    def write_record(self, run_id, rec):
+        directory = records.runs_root() / run_id
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / "run.json").write_text(json.dumps(rec), encoding="utf-8")
+        return directory
+
+    def test_a_record_is_read_back_under_the_id_it_was_found_under(self):
+        directory = self.write_record(
+            "mine-000000-aaaa", {"id": "theirs-000000-bbbb", "dir": str(self.work)})
+        for rec in (records.load_record("mine-000000-aaaa"),
+                    records.all_records()[0]):
+            self.assertEqual(rec["id"], "mine-000000-aaaa")
+            self.assertEqual(rec["dir"], str(directory))
+
+    def test_a_heartbeat_cannot_be_aimed_at_another_directory(self):
+        """The heartbeat republishes the copy on disk, whose `dir` moved."""
+        directory = records.runs_root() / "mine-000000-aaaa"
+        self.write_record("mine-000000-aaaa",
+                          {"id": "mine-000000-aaaa", "dir": str(directory),
+                           "state": "running"})
+        rec = records.load_record("mine-000000-aaaa")
+        elsewhere = self.work / "elsewhere"
+        elsewhere.mkdir()
+        self.write_record("mine-000000-aaaa",
+                          {"id": "mine-000000-aaaa", "dir": str(elsewhere),
+                           "state": "running"})
+
+        records.save_heartbeat(rec)
+
+        self.assertFalse((elsewhere / "run.json").exists())
+        self.assertTrue(json.loads((directory / "run.json")
+                                   .read_text(encoding="utf-8"))["heartbeat"])
+
+
 class TestLogTail(unittest.TestCase):
     def read_tail(self, data, count, meaningful=False):
         reads = []

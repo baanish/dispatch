@@ -158,11 +158,27 @@ def run_dir(run_id):
     return Path(directory)
 
 
+def bind_record_location(rec, run_id):
+    """Give a loaded record the id and directory it was actually found under.
+
+    `id` and `dir` are not observations, they are the addresses every later read,
+    append, lock, and atomic replace is aimed at, and a worker can write its own
+    `run.json`. Left as loaded, a record picks the directory its next heartbeat
+    publishes into.
+    """
+    if type(rec) is not dict:
+        raise DispatchError(f"run.json does not hold an object: {run_id}")
+    rec = dict(rec)
+    rec["id"] = validate_run_id(run_id)
+    rec["dir"] = str(run_dir(run_id))
+    return rec
+
+
 def load_record(run_id):
     path = run_dir(run_id) / "run.json"
     if not path.is_file():
         raise DispatchError(f"no such run: {run_id}")
-    return json.loads(path.read_text(encoding="utf-8"))
+    return bind_record_location(json.loads(path.read_text(encoding="utf-8")), run_id)
 
 
 def atomic_replace(tmp, path):
@@ -353,8 +369,9 @@ def save_heartbeat(rec):
     path = Path(rec["dir"]) / "run.json"
     with runs_lock():
         try:
-            on_disk = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
+            on_disk = bind_record_location(
+                json.loads(path.read_text(encoding="utf-8")), rec["id"])
+        except (OSError, ValueError, DispatchError):
             on_disk = dict(rec)
         on_disk["heartbeat"] = stamp
         save_record(on_disk)
@@ -365,8 +382,9 @@ def all_records():
     out = []
     for entry in sorted(runs_root().glob("*/run.json")):
         try:
-            out.append(json.loads(entry.read_text(encoding="utf-8")))
-        except (OSError, ValueError):
+            out.append(bind_record_location(
+                json.loads(entry.read_text(encoding="utf-8")), entry.parent.name))
+        except (OSError, ValueError, DispatchError):
             continue
     return out
 
