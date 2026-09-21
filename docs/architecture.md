@@ -3,8 +3,9 @@
 dispatch launches one AI-agent worker per command, caps how many can be live,
 and records what happened. Three things vary and everything else is shared:
 which vendor CLI runs (a **driver**), where its process lives (a **substrate**),
-and which model and effort it runs at (a **lane**). The rest of the tree knows
-about those three abstractions and nothing about codex, claude, grok, or any
+and which model and effort it runs at (a **lane**). The rest of the tree routes
+through those three abstractions; the few places that still name a vendor CLI
+are listed under Writing a new driver, and no place outside a substrate names a
 terminal multiplexer.
 
 ## Module map
@@ -105,9 +106,15 @@ Subclass `Driver`, fill the class attributes, implement the three argv builders
 and `validate_options`, and call `register_driver(MyDriver())`. Then add a lane
 whose `driver` field names it.
 
-The test for a complete driver: nothing in `runner.py`, `cli.py`, or any
-substrate has to branch on which CLI is running. If a branch would be needed, it
-belongs on the driver instead.
+The test for a complete driver: no substrate, and nothing that builds an argv,
+an environment, or a dialog answer, has to branch on which CLI is running. Four
+places outside the drivers still name one, and every one of them is about how a
+CLI behaves once it is up rather than how it is launched: `prompt_worker` and
+`prompt_was_delivered` treat a Codex submit as needing confirmation, `signals`
+treats its never-quiet animation as defeating the screen-idle probe, and
+`deep_activity_lines` reads only Claude's transcript, the one CLI here with a
+stable per-session format. A branch that would decide an argument belongs on the
+driver instead.
 
 ## The Substrate interface
 
@@ -409,9 +416,10 @@ dispatch run sol@medium brief.md
 
 A background run stops after `deliver_brief` and hands the home to a detached
 watcher (`dispatch _watch <id>`), which runs exactly the loop a foreground run
-runs. Nothing else supervises: every command that reads runs also reconciles the
-ones nobody is watching, which is how a finished background worker frees its cap
-slot and lands its exit code.
+runs. Nothing else supervises. `status`, `wait`, and `steer` reconcile the runs
+nobody is watching, which is how a finished background worker frees its cap slot
+and lands its exit code. `logs` and `watch` only read, because a command the
+operator reached for to look at a run should not be the one that ends it.
 
 ### Two rules worth knowing before reading `runner.py`
 
@@ -488,10 +496,14 @@ the record, because the machine has no supervising daemon either, only each
 background run's own watcher: when that watcher is gone, a run's exit code
 lands there when something reads its status.
 
-At terminal state, `out.md`, `out.json`, `status.log`, and `screen.log` are
-copied down once, and the machine's own `run.json` lands beside them as
-`remote-run.json`. It is not copied over the local record: this side's record is
-the run's identity here, and the fields worth having (state, rc, session id,
+At terminal state, the machine's own `run.json` lands beside the local record as
+`remote-run.json`, and `out.md` comes down with it. Those two decide the mirror:
+if the record fails to arrive, or a `done` run's answer does, nothing is marked
+mirrored and the next poll tries again, so a mirror with no answer in it is
+never read as the answer. `out.json`, `status.log`, and `screen.log` come down
+in the same pass, and a failure to copy one of those does not hold the mirror
+back. `remote-run.json` is not copied over the local record: this side's record
+is the run's identity here, and the fields worth having (state, rc, session id,
 the check-in ladder) are merged into it by the poll that saw it finish. From
 then on every verb reads the mirror and the connection is not touched again.
 

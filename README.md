@@ -6,7 +6,7 @@ over ssh. It launches the worker under the tightest permissions its CLI offers
 (an OS sandbox on codex lanes only, see
 [What `--write` means on each driver](#what---write-means-on-each-driver)), caps
 how many can be live at once, checks in on it while it works, and records the
-brief, the answer, and the whole log under `~/.dispatch/runs/<run id>/`.
+brief, the answer, and the run's log under `~/.dispatch/runs/<run id>/`.
 
 Requires Python 3.11 or newer, and no third-party packages.
 
@@ -67,7 +67,9 @@ dispatch run brief.md --dir . --write
 ```
 
 `dispatch run` with no lane takes the default lane, which is the `medium` slot
-unless your config names another.
+unless your config names another. A config that leaves `medium` empty falls back
+to the shipped default lane, and to its own first lane if it does not define
+that one.
 
 A foreground run blocks until the worker finishes, then prints the answer it
 wrote. `--bg` returns instead, printing the run id on its first line and the run
@@ -223,10 +225,11 @@ dispatch adds `BatchMode=yes`, because a password prompt in a background run
 hangs forever.
 
 **`dispatch` mode** is for a machine with a full install. The brief is copied
-over and handed to that machine's own `dispatch run --bg`. Until the run ends,
-`status`, `wait`, `logs`, `watch`, `kill`, `steer`, and `continue` are questions
-asked over ssh; at the end the answer, the status log, and the screen are copied
-down once and every later read is local. The far side owns the worker, so a
+over, with a `--schema` or `--image` file if the run has one, and handed to that
+machine's own `dispatch run --bg`. Until the run ends, `status`, `wait`, `logs`,
+`watch`, `kill`, `steer`, and `continue` are questions asked over ssh; at the
+end the answer and that machine's record are copied down, the status log and the
+screen come with them when they can, and every later read is local. The far side owns the worker, so a
 dropped connection costs nothing and the next poll finds the run.
 
 For a Windows host whose SSH shell is PowerShell, set `shell = "powershell"`
@@ -372,7 +375,7 @@ unreadable marker is refused rather than guessed at.
 | --- | --- |
 | 0 | The run finished and wrote its deliverable. |
 | 1 | The run failed, or `doctor` found something broken. |
-| 2 | Usage error, including a bad config file and an unknown lane. |
+| 2 | dispatch refused or could not proceed: a usage error, a bad config file, an unknown lane, a cap refusal, a missing run, or a worker that would not start. |
 | 3 | The worker refused the brief: its answer starts with `ABORT:`. |
 | 4 | A `wait` reached its `--give-up`. The run carries on. |
 
@@ -384,6 +387,7 @@ One run is one directory under `~/.dispatch/runs/<run id>/`:
 | --- | --- |
 | `run.json` | The record: lane, options, state, exit code, session id, check-in history. Replaced atomically, never edited in place. |
 | `brief.md` | The brief, as it was passed. |
+| `cmd.txt` | The argv the vendor CLI was launched with, quoted for a shell. |
 | `prompt.txt` | What dispatch typed into the worker: the preamble, the brief's path, and where to write the answer. |
 | `out.md` | The worker's answer, and the only thing captured. Anything left on a screen is lost. |
 | `out.json` | The deliverable of a `--schema` run, mirrored into `out.md`. |
@@ -391,6 +395,7 @@ One run is one directory under `~/.dispatch/runs/<run id>/`:
 | `screen.log` | What was on the worker's screen, as far back as the substrate keeps it. |
 | `pane.log` | A headless worker's captured stdout and stderr. |
 | `worker.rc` | A headless worker's exit status, written by the relay that ran it. |
+| `watcher.log` | Anything a background run's detached watcher printed, which is where it says why it could not start. |
 | `owner.lock`, `watcher.lock` | Advisory locks. A run's liveness is a held lock, never a bare pid. |
 | `remote-run.json` | For a run placed on a machine: that machine's own record, copied down at the end. |
 

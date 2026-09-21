@@ -111,7 +111,8 @@ loosening a sandbox.
 
 A machine in the default `dispatch` mode runs the work through its own dispatch,
 so dispatch, the vendor CLI, and the task's files all have to be there already:
-`--on` copies the brief and nothing else. `status`, `wait`, and `logs` query
+`--on` copies the brief, and a `--schema` or `--image` file if the run has one,
+and nothing else. `status`, `wait`, and `logs` query
 that machine until the run ends, then read the mirror copied down here. A
 machine configured in `shell` mode is driven from here over ssh instead, needs
 `--dir` to name a path on that machine, and refuses `--image`.
@@ -172,9 +173,9 @@ spent its deadline, or never started.
   supervision.
 - **Headless refuses live intervention.** Where the substrate is headless,
   `steer` and `inspect` refuse with one line, `continue` works through the
-  vendor's resume flag, and check-ins read CPU and the deliverable only. There
-  is no pane to read progress from. `dispatch doctor` names the substrate in
-  force.
+  vendor's resume flag, and check-ins read the worker's captured output, its
+  CPU, and the deliverable. There is no live screen to attach to. `dispatch
+  doctor` names the substrate in force.
 
 `dispatch skill` prints this document, and `dispatch agents-snippet` prints the
 short block for a repository's `AGENTS.md`. When a launch fails on the setup,

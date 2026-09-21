@@ -1,15 +1,13 @@
 """Tests for the herdr substrate: the socket layer itself.
 
-Two layers, and the split is deliberate:
+Every case here runs against the shared stub daemon (`herdr_stub.py`) on a temp
+unix socket, which answers with the response shapes in `herdr-protocol-19.json`.
+No real daemon is contacted and no agent CLI is ever launched, so a failure here
+is dispatch's, never the environment's.
 
-- The shared stub daemon (`herdr_stub.py`) on a temp unix socket, answering with
-  the shapes recorded off the live 0.8.0 daemon (`herdr-protocol-19.json`).
-- Integration tests against the real socket, skipped cleanly when no daemon is
-  running. Those create workspaces labelled `dispatch-test-` and close every one.
-
-No agent CLI is ever launched. The one live spawn test forces `agent.start` to
-fail so the fallback types a plain shell command, which is also how it proves
-the spawn fallback works against real primitives.
+The stub is what makes the failure paths testable: a spawn test can force
+`agent.start` to fail and watch the fallback type a plain shell command instead,
+which a real daemon would not oblige.
 """
 
 import contextlib

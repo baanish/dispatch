@@ -714,8 +714,11 @@ class TestVerbs(ConfigTestCase):
         self.assertEqual(code, cli.EXIT_FAILED)
         self.assertIn("claude not on PATH", out)
 
-    def test_the_installed_console_script_runs_the_same_verbs(self):
-        """The package, not this checkout's import path, is what a user gets."""
+    def test_a_verb_runs_in_a_fresh_process_of_its_own(self):
+        """Every other test calls `run_verb` in this process, on modules the
+        suite has already imported. A subprocess is what catches an import-time
+        break or a missing packaged resource, which is how the console script
+        would fail for a user."""
         done = subprocess.run(
             [sys.executable, "-m", "dispatch.cli", "board"],
             cwd=str(self.work), capture_output=True, text=True,
