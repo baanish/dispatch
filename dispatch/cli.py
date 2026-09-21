@@ -35,7 +35,7 @@ from .lanes import (default_lane, lane_names, looks_like_lane, resolve_lane,
 from .policy import current_depth, enforce_depth, parse_deadline, policy
 from .processes import stop_pid
 from .prompt import steer_prompt
-from .records import (COMPLETE_MARKER, RunOptions, all_records, append_status,
+from .records import (RunOptions, all_records, append_status,
                       deliverable_path,
                       hold_run_lock, last_heartbeat_age, load_record, read_output,
                       read_status_head, read_tail_bytes, read_text, replace_text,
@@ -1085,23 +1085,14 @@ def parse_give_up(text):
         raise DispatchError(f"bad --give-up: {text!r} (use 45s, 30m, 2h)")
 
 
-def status_log_complete(status_path):
-    """True once the run's own wrapper journaled its COMPLETE line."""
-    for line in read_tail_bytes(status_path, 4096).splitlines():
-        if line.startswith(COMPLETE_MARKER):
-            return True
-    return False
-
-
 def run_has_ended(rec, status_path):
-    """COMPLETE, or a terminal record: either one means nobody is working.
+    """A terminal record, and nothing else.
 
-    COMPLETE is the normal ending, but only a wrapper writes it. A killed run
-    whose watcher was already gone, and a run the reconcile sweep abandoned, are
-    just as over and never get the line.
+    The COMPLETE line in status.log is a journal entry for a reader, not the
+    ending: a worker can write in that log, and a line it wrote there used to
+    stop a waiter while the run was still going.
     """
-    return status_log_complete(status_path) \
-        or rec.get("state") in policy().terminal_states
+    return rec.get("state") in policy().terminal_states
 
 
 def wait_report(rec, status_path, count):

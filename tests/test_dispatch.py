@@ -2889,6 +2889,16 @@ class TestWait(HerdrStubTestCase):
         self.assertIn("-- worker CLI output: none recorded --", output)
         self.assertIn("dispatch's journal", output)
 
+    def test_a_complete_line_the_worker_wrote_does_not_end_a_wait(self):
+        """status.log is a file the worker can write in. The record is what says
+        a run is over."""
+        rec = self.make_live_record()
+        records.append_status(Path(rec["dir"]) / "status.log",
+                              "COMPLETE 2026-01-01T00:00:00Z state=done out=x")
+        code, output = self.wait_cli("wait", rec["id"], "--give-up", "1s")
+        self.assertEqual(code, cli.EXIT_STILL_RUNNING)
+        self.assertIn("still running", output)
+
     def test_wait_prints_the_lines_that_say_something(self):
         rec = self.logged_run("done")
         _, output = self.wait_cli("wait", rec["id"])
