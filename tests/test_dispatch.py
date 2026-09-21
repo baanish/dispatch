@@ -2769,6 +2769,26 @@ class TestWait(HerdrStubTestCase):
         self.assertIn("line 40\n", output)    # all of out.md, never a head of it
         self.assertIn("-- out.md (40 lines) --", output)
 
+    def test_an_answer_cannot_drive_the_operators_terminal(self):
+        """Escape sequences in out.md clear the screen over the result or load
+        the clipboard. Shown as marks on a terminal, untouched when redirected."""
+        hostile = "fine\x1b[2J\x1b]52;c;ZXZpbA==\x07\rgone\n"
+
+        class Terminal(io.StringIO):
+            def isatty(self):
+                return True
+
+        with contextlib.redirect_stdout(Terminal()) as terminal:
+            cli.show(hostile)
+        shown = terminal.getvalue()
+        self.assertNotIn("\x1b", shown)
+        self.assertNotIn("\x07", shown)
+        self.assertNotIn("\r", shown)
+        self.assertTrue(shown.startswith("fine") and shown.endswith("gone\n"))
+        with contextlib.redirect_stdout(io.StringIO()) as piped:
+            cli.show(hostile)
+        self.assertEqual(piped.getvalue(), hostile)
+
     def test_wait_prints_an_answer_that_has_no_trailing_newline(self):
         rec = self.logged_run("done")
         (Path(rec["dir"]) / "out.md").write_text("first\nthe last word",

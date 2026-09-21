@@ -13,6 +13,7 @@ import contextlib
 import hashlib
 import json
 import os
+import re
 import shlex
 import sys
 import time
@@ -237,7 +238,7 @@ def cmd_run(args):
             print(rec["id"])
             print(rec["dir"])
             return EXIT_OK
-        sys.stdout.write(read_output(rec))
+        show(read_output(rec))
         return state_exit_code(rec["state"])
     else:
         remote.check_shell_options(machine, opts)
@@ -263,7 +264,7 @@ def cmd_run(args):
                           parse_deadline(opts.deadline) if opts.deadline else None)
     finally:
         release_run_lock(handle)
-    sys.stdout.write(read_output(rec))
+    show(read_output(rec))
     return state_exit_code(rec["state"])
 
 
@@ -376,7 +377,7 @@ def cmd_continue(args):
         print(child["id"])
         print(child["dir"])
         return EXIT_OK
-    sys.stdout.write(read_output(child))
+    show(read_output(child))
     return state_exit_code(child["state"])
 
 
@@ -394,7 +395,7 @@ def continue_on_machine(rec, lane, message, args):
         print(child["id"])
         print(child["dir"])
         return EXIT_OK
-    sys.stdout.write(read_output(child))
+    show(read_output(child))
     return state_exit_code(child["state"])
 
 
@@ -552,18 +553,18 @@ def cmd_logs(args):
     if not path.is_file():
         raise DispatchError(f"{args.id} has no status.log yet")
     if not args.follow:
-        sys.stdout.write(path.read_text(encoding="utf-8", errors="replace"))
+        show(path.read_text(encoding="utf-8", errors="replace"))
         return EXIT_OK
     with open(path, "r", encoding="utf-8", errors="replace") as fh:
         while True:
             line = fh.readline()
             if line:
-                sys.stdout.write(line)
+                show(line)
                 sys.stdout.flush()
                 continue
             current = load_record(args.id)
             if current.get("state") in policy().terminal_states:
-                sys.stdout.write(fh.read())
+                show(fh.read())
                 return EXIT_OK
             time.sleep(1)
 
@@ -579,9 +580,9 @@ def remote_logs(rec, args):
     while True:
         text = remote.remote_log(rec)
         if text.startswith(printed):
-            sys.stdout.write(text[len(printed):])
+            show(text[len(printed):])
         else:
-            sys.stdout.write(text)
+            show(text)
         sys.stdout.flush()
         printed = text
         if not args.follow or rec.get("state") in policy().terminal_states:
@@ -703,11 +704,29 @@ def head_lines(text, count):
     return text.splitlines()[:count]
 
 
+TERMINAL_CONTROLS = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")
+
+
+def show(text):
+    """Print text a worker wrote, without letting it drive the terminal.
+
+    An answer, a status line, or a screen can carry escape sequences, and printed
+    raw they clear the screen over a result, rewrite what was shown, or on some
+    terminals load the clipboard. On a terminal every control character but
+    newline and tab is shown as a mark instead. Redirected output is the file as
+    it is, byte for byte.
+    """
+    if sys.stdout.isatty():
+        text = TERMINAL_CONTROLS.sub(
+            lambda found: "\u241b" if found.group() == "\x1b" else "\ufffd", text)
+    sys.stdout.write(text)
+
+
 def emit_frame(lines, redraw):
     """Print a frame, clearing first when this is a follow on a real terminal."""
     if redraw and sys.stdout.isatty():
         sys.stdout.write("\033[H\033[2J")
-    sys.stdout.write("\n".join(lines) + "\n")
+    show("\n".join(lines) + "\n")
     sys.stdout.flush()
 
 
