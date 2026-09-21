@@ -516,7 +516,7 @@ class TestSpawnPath(HerdrTestCase):
         self.assertEqual(self.params_for("pane.send_text")[0]["text"],
                          "& 'claude' '-p' 'do the thing; rm -rf /'"
                          if processes.IS_WINDOWS
-                         else "claude -p 'do the thing; rm -rf /'")
+                         else "command claude -p 'do the thing; rm -rf /'")
 
     def test_fallback_is_stamped_into_the_run_record(self):
         self.stub.errors["agent.start"] = ERRORS["unsupported_agent_kind"]

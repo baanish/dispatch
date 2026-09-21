@@ -80,8 +80,11 @@ class Driver:
     agent_kind = ""
 
     # Prefixed to the argv when the command is typed at a real interactive
-    # shell, where a user function of the same name would shadow the binary.
-    shell_prefix = ()
+    # shell, where a function or alias of the same name would shadow the binary
+    # and could drop or widen the permission flags the lane pins. Every driver,
+    # because any CLI name can be shadowed. The PowerShell dialect has no
+    # equivalent and types the bare name.
+    shell_prefix = ("command",)
 
     # (command, how many enters it takes). Interactive workers do not take
     # themselves down: they finish a turn and sit at the prompt, so the runner

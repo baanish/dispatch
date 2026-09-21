@@ -575,7 +575,9 @@ class TestPaneSpawn(HerdrStubTestCase):
         self.assertTrue(typed.startswith("& 'codex' " if processes.IS_WINDOWS
                                          else "command codex "), typed)
 
-    def test_only_the_codex_lane_carries_that_prefix(self):
+    def test_every_lane_is_typed_past_a_shell_function_of_its_name(self):
+        """A `claude` or `grok` function in the pane's shell could drop the
+        permission flags the lane pins, exactly as a `codex` one could."""
         if processes.IS_WINDOWS:
             # PowerShell has no `command` builtin to prefix with, so both lanes
             # read the same there and only the quoting is the dialect's.
@@ -584,7 +586,10 @@ class TestPaneSpawn(HerdrStubTestCase):
             self.assertEqual(herdr.PANE_SHELL.command_line(drivers.get_driver("codex").shell_prefix, ["codex", "-x"]),
                              "& 'codex' '-x'")
             return
-        self.assertEqual(herdr.PANE_SHELL.command_line(drivers.get_driver("claude").shell_prefix, ["claude", "-x"]), "claude -x")
+        self.assertEqual(herdr.PANE_SHELL.command_line(drivers.get_driver("claude").shell_prefix, ["claude", "-x"]),
+                         "command claude -x")
+        self.assertEqual(herdr.PANE_SHELL.command_line(drivers.get_driver("grok").shell_prefix, ["grok", "-x"]),
+                         "command grok -x")
         self.assertEqual(herdr.PANE_SHELL.command_line(drivers.get_driver("codex").shell_prefix, ["codex", "-x"]),
                          "command codex -x")
 

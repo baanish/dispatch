@@ -71,9 +71,6 @@ NET = {True: "true", False: "false"}
 class CodexDriver(Driver):
     name = "codex"
     agent_kind = "codex"
-    # A pane is a real interactive shell, where a user function named `codex`
-    # would shadow the binary.
-    shell_prefix = ("command",)
     # Two enters: the first is swallowed by the slash-command autocomplete
     # popup, so one enter leaves the command sitting there unsent.
     exit_command = ("/quit", 2)
