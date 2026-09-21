@@ -532,7 +532,7 @@ def cmd_status(args):
         live_records(sweep())
     records = all_records()
     rows = []
-    for rec in sorted(records, key=lambda r: r.get("created", "")):
+    for rec in sorted(records, key=lambda r: str(r.get("created") or "")):
         status_path = Path(rec["dir"]) / "status.log"
         head = read_status_head(status_path)
         state = rec.get("state", "?")
@@ -796,7 +796,7 @@ def watch_rows(substrate=None):
     """One row per run worth looking at: live ones, plus the recently finished."""
     rows = []
     now = time.time()
-    for rec in sorted(all_records(), key=lambda r: r.get("created", "")):
+    for rec in sorted(all_records(), key=lambda r: str(r.get("created") or "")):
         state = rec.get("state", "?")
         terminal = state in policy().terminal_states
         if terminal and not rec.get("inspect_worker"):

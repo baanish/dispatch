@@ -41,14 +41,13 @@ from .errors import DispatchError
 from .policy import (DEPTH_ENV, child_depth, current_depth, hand_timeout_seconds,
                      parse_deadline, policy)
 from .processes import popen_detached, resolve_python
-from .records import (ABORT_MARKER, HEARTBEAT_SECONDS, STEER_TURN_FIELDS,
-                      append_status,
-                      deliverable_path, hold_run_lock, new_run_id, out_copy_dir,
-                      out_copy_path, read_output, read_tail_bytes,
-                      release_run_lock, replace_text,
-                      run_dir, save_final_record, save_heartbeat, save_record,
-                      open_append, utc_now, validate_session_id, write_out_copy,
-                      write_status_header)
+from .records import (ABORT_MARKER, HEARTBEAT_SECONDS, RECORD_BYTE_LIMIT,
+                      STEER_TURN_FIELDS, append_status, deliverable_path,
+                      hold_run_lock, new_run_id, open_append, out_copy_dir,
+                      out_copy_path, read_output, read_regular_bytes,
+                      read_tail_bytes, release_run_lock, replace_text, run_dir,
+                      save_final_record, save_heartbeat, save_record, utc_now,
+                      validate_session_id, write_out_copy, write_status_header)
 from .substrates.base import SubstrateError, Worker, WorkerSetupError
 
 # The one substrate error code the runner acts on rather than reports: the
@@ -1710,8 +1709,11 @@ class RunWrapper:
         seen, and starts the turn again from what the steer wrote.
         """
         try:
-            on_disk = json.loads((self.dir / "run.json").read_text(encoding="utf-8"))
-        except (OSError, ValueError):
+            on_disk = json.loads(read_regular_bytes(self.dir / "run.json",
+                                                    RECORD_BYTE_LIMIT))
+        except (OSError, ValueError, DispatchError):
+            return False
+        if not isinstance(on_disk, dict):
             return False
         # Against what this process has taken up, not against its copy of the
         # record: a save in between carries the steer's fields into that copy,
