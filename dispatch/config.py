@@ -131,7 +131,7 @@ def _read_toml(path):
             return tomllib.load(handle)
     except OSError as exc:
         raise DispatchError(f"{path}: cannot be read: {exc}") from exc
-    except tomllib.TOMLDecodeError as exc:
+    except (tomllib.TOMLDecodeError, UnicodeDecodeError) as exc:
         raise DispatchError(f"{path}: not valid TOML: {exc}") from exc
 
 
@@ -141,10 +141,22 @@ def _user_config(data, path):
     _known_keys(general, GENERAL_KEYS, "general", path)
 
     machines = _machines(_table(data, "machines", "", path), path)
-    lanes = _lanes(_table(data, "lanes", "", path), machines, path)
+    lane_data = _table(data, "lanes", "", path)
+    if "lanes" in data and not lane_data:
+        # An empty table is not an absent one. Read as absent it brought the
+        # built-in lanes back, for an operator who had just removed their last.
+        raise DispatchError(f"{path}: [lanes]: define at least one lane, or "
+                            "remove the table to keep the built-in ones")
+    lanes = _lanes(lane_data, machines, path)
     board, notes = _board(_table(data, "board", "", path), path)
 
     substrate = _string(general, "substrate", "general", path)
+    if substrate:
+        from .substrates import SUBSTRATES
+        if substrate not in SUBSTRATES:
+            raise DispatchError(
+                f"{path}: [general] substrate: {substrate!r} is not one of "
+                + ", ".join(sorted(SUBSTRATES)) + "; leave it empty to detect")
     preamble = _string(general, "prompt_preamble", "general", path) or DEFAULT_PREAMBLE
 
     _validate_board(board, lanes, path)

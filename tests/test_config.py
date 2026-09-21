@@ -690,6 +690,23 @@ class TestVerbs(ConfigTestCase):
         code, out = self.run_cli("board")
         self.assertEqual(code, cli.EXIT_OK, out)
 
+    def test_config_mistakes_are_named_at_load_not_met_later(self):
+        """An empty [lanes] table used to bring the built-in lanes back, an
+        unknown substrate surfaced at the first run, and a file that was not
+        UTF-8 was a traceback."""
+        for body, expected in (
+                ("[lanes]\n", "define at least one lane"),
+                ('[general]\nsubstrate = "screen"\n', "substrate"),
+                (b"[general]\nsubstrate = \"\xff\"\n", "not valid TOML")):
+            with self.subTest(expected=expected):
+                path = self.home / ".config" / "dispatch" / "config.toml"
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(body if isinstance(body, bytes) else body.encode())
+                with self.assertRaises(DispatchError) as caught:
+                    config.load_config()
+                self.assertIn(expected, str(caught.exception))
+                self.assertIn(str(path), str(caught.exception))
+
     def test_a_broken_config_stops_the_verb_and_names_the_file(self):
         self.write_user_config("[board\n")
         code, out = self.run_cli("board")
