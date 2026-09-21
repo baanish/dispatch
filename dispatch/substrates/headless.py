@@ -52,8 +52,8 @@ from ..processes import (descendant_pids, pid_alive, pid_is_zombie, popen_detach
                          pids_cpu_percent, resolve_python, stop_pid,
                          stop_process_group, which_absolute)
 from ..policy import policy
-from ..records import (open_append, read_tail_bytes, replace_text, run_dir,
-                       runs_root)
+from ..records import (RECORD_BYTE_LIMIT, open_append, read_regular_bytes,
+                       read_tail_bytes, replace_text, run_dir, runs_root)
 from .base import (Substrate, SubstrateCapabilities, SubstrateError, SpawnResult,
                    Worker, WorkerProcess)
 
@@ -75,12 +75,14 @@ SCREEN_TAIL_BYTES = 65536
 # the status down where any later process can read it. The relay is also what
 # owns the process group dispatch signals, which is how a kill reaches the CLI's
 # own children on both platforms.
-# The status file is opened without following a link, because the worker may be
-# able to write in the run directory it lands in.
+# The status is written to a new file and moved into place, because the worker
+# may be able to write in the run directory: opened in place, the name could be
+# a link, or a hard link to another file, which the truncate then emptied.
 RC_RELAY = ("import os,subprocess,sys; rc=subprocess.call(sys.argv[2:]); "
-            "fd=os.open(sys.argv[1],os.O_WRONLY|os.O_CREAT|os.O_TRUNC|"
+            "tmp=sys.argv[1]+'.'+str(os.getpid()); "
+            "fd=os.open(tmp,os.O_WRONLY|os.O_CREAT|os.O_EXCL|"
             "getattr(os,'O_NOFOLLOW',0),0o666); os.write(fd,str(rc).encode()); "
-            "os.close(fd); sys.exit(rc)")
+            "os.close(fd); os.replace(tmp,sys.argv[1]); sys.exit(rc)")
 
 
 # The variables dispatch itself hands a worker. Anything else found in the saved
@@ -124,11 +126,18 @@ class HeadlessSubstrate(Substrate):
         return run_dir(worker.id)
 
     def read_state(self, worker):
+        """The saved state, or nothing at all if it is not what dispatch wrote.
+
+        Every home is read on every sweep, finished ones too, under the runs
+        lock: a FIFO here blocked that read, and a list or a string crashed the
+        sweep for every run on the machine.
+        """
         try:
-            return json.loads(
-                (self.home(worker) / STATE_FILE).read_text(encoding="utf-8"))
+            state = json.loads(read_regular_bytes(self.home(worker) / STATE_FILE,
+                                                  RECORD_BYTE_LIMIT))
         except (OSError, ValueError, DispatchError):
             return {}
+        return state if isinstance(state, dict) else {}
 
     def save_state(self, worker, state):
         replace_text(self.home(worker) / STATE_FILE, json.dumps(state, indent=2))
@@ -285,12 +294,9 @@ class HeadlessSubstrate(Substrate):
 
     def read_exit_code(self, worker, run_id="", log_path=None):
         """The process's own status, as the relay wrote it down."""
-        path = self.home(worker) / RC_FILE
         try:
-            if path.is_symlink():
-                return None
-            return int(path.read_text(encoding="utf-8").strip())
-        except (OSError, ValueError):
+            return int(read_regular_bytes(self.home(worker) / RC_FILE, 32).strip())
+        except (OSError, ValueError, DispatchError):
             return None
 
     # -- typing, which this substrate cannot do --------------------------

@@ -292,6 +292,21 @@ class TestHeadlessLiveness(HeadlessTestCase):
         self.assertNotIn("CLAUDE_CODE_PROMPT_CACHE_TTL",
                          headless.launch_environment(env))
 
+    def test_a_state_file_that_is_not_dispatchs_does_not_break_the_sweep(self):
+        """Every home is read on every sweep, under the runs lock. A list where
+        the state belongs crashed it for every run, and a FIFO blocked it."""
+        from dispatch.substrates import headless
+        substrate = headless.HeadlessSubstrate()
+        worker = substrate.open("sol@medium-000000-state")
+        state = substrate.home(worker) / headless.STATE_FILE
+        state.write_text("[]", encoding="utf-8")
+        self.assertEqual(substrate.read_state(worker), {})
+        if hasattr(os, "mkfifo"):
+            state.unlink()
+            os.mkfifo(state)
+            self.assertEqual(substrate.read_state(worker), {})
+        self.assertNotIn(worker.id, substrate.worker_ids())
+
     def test_a_status_file_written_while_the_relay_runs_ends_nothing(self):
         """The relay writes worker.rc as its last act. One that shows up while
         the relay is still running came from the worker, and believing it ended
