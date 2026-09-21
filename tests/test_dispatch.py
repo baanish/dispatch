@@ -1155,6 +1155,11 @@ class TestATurnEndIsNotARunEnd(HerdrStubTestCase):
         self.assertEqual(rec["state"], "failed")
         self.assertIn("NO-DELIVERABLE", (Path(rec["dir"]) / "status.log").read_text())
         self.assertFalse(rec.get("nudged"))
+        # The salvage fills out.md all the same, so the record is what tells a
+        # reader that the text in it is a screen and not an answer.
+        self.assertIs(rec["deliverable_written"], False)
+        _, output = self.capture_stdout("wait", rec["id"])
+        self.assertIn("-- out.md: no answer --", output)
 
 
 # --------------------------------------------------------------------------
@@ -2598,7 +2603,66 @@ class TestWait(HerdrStubTestCase):
         self.assertEqual(code, cli.EXIT_OK)
         self.assertIn("COMPLETE", output)
         self.assertIn("line 1\n", output)
-        self.assertNotIn("line 31", output)   # the head of out.md, not all of it
+        self.assertIn("line 40\n", output)    # all of out.md, never a head of it
+        self.assertIn("-- out.md (40 lines) --", output)
+
+    def test_wait_prints_an_answer_that_has_no_trailing_newline(self):
+        rec = self.logged_run("done")
+        (Path(rec["dir"]) / "out.md").write_text("first\nthe last word",
+                                                 encoding="utf-8")
+        _, output = self.wait_cli("wait", rec["id"])
+        self.assertIn("-- out.md (2 lines) --\nfirst\nthe last word\n", output)
+
+    def test_wait_says_so_when_there_is_no_answer(self):
+        """Missing, empty, and the runner's own copy of the last screen are each
+        named, because any of them printed bare reads as the deliverable."""
+        rec = self.logged_run("failed")
+        out = Path(rec["dir"]) / "out.md"
+        out.unlink(missing_ok=True)
+        code, output = self.wait_cli("wait", rec["id"])
+        self.assertEqual(code, cli.EXIT_FAILED)
+        self.assertIn("-- out.md: missing --", output)
+
+        out.write_text("\n  \n", encoding="utf-8")
+        _, output = self.wait_cli("wait", rec["id"])
+        self.assertIn("-- out.md: empty --", output)
+
+        out.write_text("error: not logged in\n", encoding="utf-8")
+        rec["deliverable_written"] = False
+        records.save_record(rec)
+        _, output = self.wait_cli("wait", rec["id"])
+        self.assertIn("-- out.md: no answer --", output)
+        self.assertIn("ended failed without writing one", output)
+        self.assertNotIn("-- out.md (", output)
+
+    def test_wait_ends_with_the_tail_of_the_workers_own_cli_output(self):
+        """The last 30 lines of what the CLI printed, errors included, from
+        pane.log for a headless worker and screen.log for one in a pane."""
+        rec = self.logged_run("failed")
+        directory = Path(rec["dir"])
+        (directory / "screen.log").write_text(
+            "".join(f"screen {n}\n" for n in range(1, 51))
+            + "error: stream disconnected", encoding="utf-8")
+        code, output = self.wait_cli("wait", rec["id"])
+        self.assertEqual(code, cli.EXIT_FAILED)
+        self.assertIn(f"-- worker CLI output: last 30 lines of "
+                      f"{directory / 'screen.log'} --", output)
+        self.assertIn("screen 22\n", output)
+        self.assertNotIn("screen 21\n", output)
+        self.assertTrue(output.rstrip().endswith("error: stream disconnected"))
+
+        (directory / "pane.log").write_text("Traceback\nrc 2\n", encoding="utf-8")
+        _, output = self.wait_cli("wait", rec["id"])
+        self.assertIn(f"-- worker CLI output: last 2 lines of "
+                      f"{directory / 'pane.log'} --\nTraceback\nrc 2\n", output)
+
+    def test_wait_never_passes_the_status_log_off_as_cli_output(self):
+        rec = self.logged_run("failed")
+        for name in ("pane.log", "screen.log"):
+            (Path(rec["dir"]) / name).unlink(missing_ok=True)
+        _, output = self.wait_cli("wait", rec["id"])
+        self.assertIn("-- worker CLI output: none recorded --", output)
+        self.assertIn("dispatch's journal", output)
 
     def test_wait_prints_the_lines_that_say_something(self):
         rec = self.logged_run("done")

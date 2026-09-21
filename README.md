@@ -84,7 +84,7 @@ dispatch wait 4f2c1a                # block, then print the answer
 | --- | --- |
 | `dispatch run [lane] <brief>` | One worker, one brief. Prints the answer, or the run id under `--bg`. |
 | `dispatch status` | One line per run, and the sweep that settles finished background runs. |
-| `dispatch wait <id> [--give-up 30m]` | Block until the run ends, then print its log tail and answer. |
+| `dispatch wait <id> [--give-up 30m]` | Block until the run ends, then print its status tail, the whole answer, and the last 30 lines of the worker CLI's own output. |
 | `dispatch logs <id> [-f]` | The run's own status log. |
 | `dispatch watch [id] [-f] [--deep] [--attach]` | The multi-run wall, one run followed, one deep snapshot, or its live terminal. |
 | `dispatch steer <id> <message>` | Type a correction into a live worker. |

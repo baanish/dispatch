@@ -126,7 +126,7 @@ finished.
 
 | Command | What it does |
 | --- | --- |
-| `dispatch wait <id> [--give-up 45m]` | Block until the run ends, then print the status tail and the answer. Giving up ends the waiter only. |
+| `dispatch wait <id> [--give-up 45m]` | Block until the run ends, then print the status tail, the whole answer (or a plain statement that there is none), and the last 30 lines of the worker CLI's own output. Giving up ends the waiter only. |
 | `dispatch status` | One line per run: state and check-ins. |
 | `dispatch watch [<id>] [-f] [--deep]` | The wall, one run followed, or one snapshot of state, logs, and the answer so far. |
 | `dispatch logs <id> [-f]` | Print or follow the status log. |

@@ -103,7 +103,8 @@ REMOTE_RECORD_FILE = "remote-run.json"
 # worker exists in the remote's substrate, and a local sweep that found the id
 # in a record would look for it here and call the run orphaned.
 POLLED_FIELDS = ("state", "rc", "finished", "error", "session_id", "needs_hand",
-                 "checkins", "checkin_verdict", "aborted", "started_at")
+                 "checkins", "checkin_verdict", "aborted", "started_at",
+                 "deliverable_written")
 
 
 @dataclass(frozen=True)

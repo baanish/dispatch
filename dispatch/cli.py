@@ -79,7 +79,7 @@ DEEP_TRANSCRIPT_BYTES = 262144
 # than the run it is watching.
 WAIT_POLL_SECONDS = 3.0
 WAIT_LOG_LINES = 6
-WAIT_OUT_LINES = 30
+WAIT_CLI_LINES = 30
 
 # How often a verb that is following a run on another machine goes back over the
 # connection. Slower than the local cadence: every look is an ssh round trip.
@@ -1026,6 +1026,52 @@ def wait_report(rec, status_path, count):
     return lines
 
 
+def wait_answer_section(rec):
+    """All of out.md, or a plain statement of why there is no answer to print.
+
+    Never a head or a tail: the waiter asked for the answer, and a cut one reads
+    as a complete one. A run whose worker wrote nothing still has an out.md,
+    because the runner copies the last screen into it for the post-mortem, and
+    that copy is named for what it is instead of being printed as an answer.
+    """
+    path = Path(rec["dir"]) / "out.md"
+    state = rec.get("state", "?")
+    if rec.get("deliverable_written") is False:
+        return ["-- out.md: no answer --",
+                f"the worker ended {state} without writing one; {path} holds "
+                "dispatch's copy of its last output, not a deliverable"]
+    if not path.is_file():
+        return ["-- out.md: missing --",
+                f"the run ended {state} and {path} was never written"]
+    answer = read_output(rec).splitlines()
+    if not any(line.strip() for line in answer):
+        return ["-- out.md: empty --",
+                f"the run ended {state} and {path} has nothing in it"]
+    return [f"-- out.md ({len(answer)} lines) --"] + answer
+
+
+def wait_cli_section(rec):
+    """The end of what the worker's CLI itself printed, labeled with its source.
+
+    `pane.log` is a headless worker's stdout and stderr. `screen.log` is the last
+    screen of a worker that ran in a pane, and what a remote run mirrors down.
+    status.log is dispatch's journal of the run and says nothing the CLI said,
+    so it is never offered as this section.
+    """
+    directory = Path(rec["dir"])
+    for name in ("pane.log", "screen.log"):
+        tail = tail_lines(directory / name, WAIT_CLI_LINES)
+        if any(line.strip() for line in tail):
+            return [f"-- worker CLI output: last {len(tail)} lines of "
+                    f"{directory / name} --"] + tail
+    other = rec.get("transcript") or ""
+    return ["-- worker CLI output: none recorded --",
+            f"no pane.log or screen.log with anything in it under {directory}; "
+            + (f"the CLI's own transcript is {other}" if other else
+               "the status lines above are dispatch's journal, the only "
+               "diagnostic this run has")]
+
+
 def cmd_wait(args):
     """Block until a run ends, then print what ended it.
 
@@ -1078,15 +1124,7 @@ def cmd_wait(args):
         pace = REMOTE_FOLLOW_SECONDS if remote.is_remote(rec) else WAIT_POLL_SECONDS
         time.sleep(pace if left is None else min(pace, left))
     lines = wait_report(rec, status_path, WAIT_LOG_LINES)
-    answer = read_output(rec).splitlines()
-    out_head = answer[:WAIT_OUT_LINES]
-    if out_head:
-        lines.append("")
-        lines.append("-- out.md --")
-        lines += out_head
-        if len(answer) > len(out_head):
-            lines.append(f"-- first {len(out_head)} of {len(answer)} lines; the "
-                         f"rest is in {Path(rec['dir']) / 'out.md'} --")
+    lines += [""] + wait_answer_section(rec) + [""] + wait_cli_section(rec)
     emit_frame(lines, redraw=False)
     return state_exit_code(rec.get("state", ""))
 

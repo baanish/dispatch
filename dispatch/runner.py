@@ -2331,6 +2331,9 @@ class RunWrapper:
         # that wrote nothing look like one that wrote something.
         deliverable = deliverable_path(self.rec)
         wrote_deliverable = deliverable.is_file() and deliverable.stat().st_size > 0
+        # On the record, so a reader can tell the worker's answer from the copy
+        # of its screen that the salvage leaves in out.md.
+        self.rec["deliverable_written"] = wrote_deliverable
         finalize_output(self.rec)
         # Only when we do not already know it: a CLI handed a session id at spawn
         # makes that value the fact and the screen merely a report of it.
