@@ -238,7 +238,8 @@ instead.
 dispatch run brief.md --on workshop --dir /srv/checkout --write
 ```
 
-Hosts, users, keys, ports, and jump hosts come from your own ssh config.
+Hosts, users, keys, ports, and jump hosts come from your own ssh config. Files
+cross with `scp -s`, so this machine needs OpenSSH 8.7 or later.
 dispatch adds `BatchMode=yes`, because a password prompt in a background run
 hangs forever.
 
