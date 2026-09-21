@@ -11,6 +11,7 @@ import os
 import sys
 import time
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 TESTS_DIR = Path(__file__).resolve().parent
@@ -146,6 +147,22 @@ class TestHeadlessRun(HeadlessTestCase):
             rec = records.load_record(rec_id)
         self.assertEqual(rec["state"], "done", rec.get("error"))
         self.assertFalse(marker.exists())
+
+    def test_a_kill_stops_each_descendant_even_when_the_group_signal_worked(self):
+        """A descendant that called setsid is outside the group, so a group
+        signal that succeeds says nothing about it."""
+        from dispatch.substrates import headless
+        substrate = headless.HeadlessSubstrate()
+        stopped = []
+        with patch.object(headless.HeadlessSubstrate, "read_state",
+                          return_value={"pid": 111}), \
+                patch.object(headless.HeadlessSubstrate, "read_exit_code",
+                             return_value=None), \
+                patch.object(headless, "descendant_pids", return_value=[222, 333]), \
+                patch.object(headless, "stop_process_group", return_value=True), \
+                patch.object(headless, "stop_pid", side_effect=stopped.append):
+            substrate.kill_worker_tree(object())
+        self.assertEqual(stopped, [222, 333, 111])
 
 
 class TestHeadlessLiveness(HeadlessTestCase):

@@ -272,8 +272,10 @@ class HeadlessSubstrate(Substrate):
             # pid now belongs to somebody else.
             return []
         children = descendant_pids([pid])
-        if not stop_process_group(pid):
-            for child in children:
-                stop_pid(child)
+        stop_process_group(pid)
+        # Each one as well, whatever the group signal did: a descendant that
+        # called setsid left the group and outlives it.
+        for child in children:
+            stop_pid(child)
         stop_pid(pid)
         return children + [pid]
