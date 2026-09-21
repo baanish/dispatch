@@ -516,6 +516,22 @@ class TestTerminalMirror(FakeSshTestCase):
         self.assertEqual(self.local("out.md").read_text(encoding="utf-8"),
                          "the deliverable\n")
 
+    def test_a_copy_that_raises_still_leaves_the_answer_owed(self):
+        """A timed-out scp raises rather than returning False. The run was
+        already saved `done` by then, with nothing saying its files were owed,
+        so no later poll fetched them and `wait` exited 0 with no answer."""
+        with patch.object(remote, "scp_down",
+                          side_effect=DispatchError("scp timed out")):
+            self.main_out(["status"])
+        rec = records.load_record(self.rec["id"])
+        self.assertEqual(rec["state"], "done")
+        self.assertTrue(rec["mirror_pending"])
+        self.assertFalse(rec.get("mirrored"))
+        self.main_out(["status"])
+        self.assertEqual(self.local("out.md").read_text(encoding="utf-8"),
+                         "the deliverable\n")
+        self.assertFalse(records.load_record(self.rec["id"]).get("mirror_pending"))
+
     def test_a_done_run_whose_answer_never_arrives_is_not_exit_0(self):
         """The machine said `done`. With nothing copied down, 0 would tell the
         caller an answer is in hand."""

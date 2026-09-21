@@ -699,6 +699,12 @@ def poll_remote_run(rec, machine=None):
     rec.update(polled_changes(reported, rec, machine))
     rec["polled"] = utc_now()
     rec.pop("remote_error", None)
+    if rec.get("state") in policy().terminal_states and not rec.get("mirrored"):
+        # Owed from the same write that publishes the ending, and cleared only
+        # by a copy that worked. Set after a failed copy instead, a copy that
+        # raised (a timeout) or a process that died in between left a `done`
+        # run that nothing would fetch again and `wait` reported as exit 0.
+        rec["mirror_pending"] = True
     save_record(rec)
     if rec.get("state") in policy().terminal_states:
         rec = mirror_remote_run(rec, machine)
@@ -735,9 +741,13 @@ def mirror_remote_run(rec, machine=None):
     # that ended `done`, so failing to copy either is the connection failing, not
     # a file being absent. Unmarked, so a later poll tries again instead of
     # reading a mirror with no answer in it as the run's answer.
-    copied = scp_down(machine, remote_path(rec, "run.json"),
-                      directory / REMOTE_RECORD_FILE)
-    answered = scp_down(machine, remote_path(rec, "out.md"), directory / "out.md")
+    try:
+        copied = scp_down(machine, remote_path(rec, "run.json"),
+                          directory / REMOTE_RECORD_FILE)
+        answered = scp_down(machine, remote_path(rec, "out.md"),
+                            directory / "out.md")
+    except DispatchError:
+        copied = answered = False
     if not copied or (rec.get("state") == "done" and not answered):
         rec["remote_error"] = (f"machine {machine.name}: the run ended but its "
                                "files could not be copied down yet")
