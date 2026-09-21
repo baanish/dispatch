@@ -33,13 +33,14 @@ from .errors import DispatchError
 from .lanes import (default_lane, lane_names, looks_like_lane, resolve_lane,
                     valid_lanes_hint)
 from .policy import current_depth, enforce_depth, parse_deadline, policy
-from .processes import stop_pid
+from .processes import checked_pid, stop_pid
 from .prompt import steer_prompt
 from .records import (RunOptions, all_records, append_status,
                       deliverable_path,
                       hold_run_lock, last_heartbeat_age, load_record, read_output,
                       read_status_head, read_tail_bytes, read_text, replace_text,
                       release_run_lock, runs_lock, runs_root, sanitize_log_line,
+                      steer_count,
                       save_record,
                       stamp_epoch, utc_now, validate_run_id)
 from .runner import (STEER_INTERRUPT_SECONDS, RunWrapper, SubstrateSweep,
@@ -520,7 +521,7 @@ def cmd_steer(args):
     # prompt left the whole delivery for that watcher to exit the worker in.
     rec["steered"] = utc_now()
     # Counted as well: two steers inside one second carry the same stamp.
-    rec["steers"] = int(rec.get("steers") or 0) + 1
+    rec["steers"] = steer_count(rec) + 1
     # The answer already on disk belongs to the turn being corrected. Noted by
     # size and time, so it cannot end the new turn unless the worker rewrites it.
     with contextlib.suppress(OSError):
@@ -645,12 +646,34 @@ def remote_logs(rec, args):
         rec = remote.reconcile_remote_run(load_record(rec["id"]))
 
 
+def stop_a_worker_its_record_disowns(rec):
+    """Stop a worker that is still running under a record that says it ended.
+
+    A record is a file the worker can write in, so `done` there is not proof
+    the CLI has gone: a worker that wrote it would otherwise be one `kill`
+    declines to touch, running on with its slot already freed.
+    """
+    if rec.get("state") not in policy().terminal_states or not rec.get("worker_id"):
+        return
+    with contextlib.suppress(SubstrateError, OSError, DispatchError):
+        substrate = substrate_for(rec)
+        if rec["worker_id"] in (substrate.worker_ids() or ()) \
+                and worker_belongs_to_run(rec, substrate):
+            worker = record_worker(rec)
+            substrate.kill_worker_tree(worker)
+            substrate.close(worker, release=False)
+            append_status(Path(rec["dir"]) / "status.log",
+                          f"KILL {utc_now()} the worker outlived a record that "
+                          f"said {rec['state']}")
+
+
 def cmd_kill(args):
     """Stop a run's worker and close its home."""
     rec = load_record(validate_run_id(args.id))
     if remote.is_remote(rec):
         return kill_on_machine(rec)
     if not run_is_live(rec, record_worker_ids(rec)):
+        stop_a_worker_its_record_disowns(rec)
         state = rec.get("state", "gone")
         if state not in policy().terminal_states:
             state = "orphaned"
@@ -664,8 +687,8 @@ def cmd_kill(args):
     # Stop the watcher before the worker. It is the deadline owner and the
     # finalizer; leaving it alive while its worker dies lets it write `done` over
     # an explicit kill, and race the teardown for the last screen.
-    watcher = rec.get("watcher_pid")
-    if watcher and int(watcher) != os.getpid():
+    watcher = checked_pid(rec.get("watcher_pid"))
+    if watcher and watcher != os.getpid():
         stop_pid(watcher)
     substrate = substrate_for(rec)
     # Whatever the worker had written by now, before its home goes: a shell-mode

@@ -46,7 +46,8 @@ from .records import (ABORT_MARKER, HEARTBEAT_SECONDS, RECORD_BYTE_LIMIT,
                       hold_run_lock, new_run_id, open_append, out_copy_dir,
                       out_copy_path, read_output, read_regular_bytes,
                       read_tail_bytes, release_run_lock, replace_text, run_dir,
-                      save_final_record, save_heartbeat, save_record, utc_now,
+                      save_final_record, save_heartbeat, save_record, steer_count,
+                      utc_now,
                       validate_session_id, write_out_copy, write_status_header)
 from .substrates.base import SubstrateError, Worker, WorkerSetupError
 
@@ -738,7 +739,7 @@ class RunWrapper:
         # Enters put into a handed-back trust dialog this run, capped.
         self._trust_attempts = 0
         self._prompted_at = 0.0
-        self._steers_seen = int(rec.get("steers") or 0)
+        self._steers_seen = steer_count(rec)
         self._worked_since_prompt = False
         self._settled_since = None
         # What the substrate said on the last look, so the end-of-run condition
@@ -1724,9 +1725,9 @@ class RunWrapper:
         # Against what this process has taken up, not against its copy of the
         # record: a save in between carries the steer's fields into that copy,
         # and the turn still has to be started again here.
-        if int(on_disk.get("steers") or 0) == self._steers_seen:
+        if steer_count(on_disk) == self._steers_seen:
             return False
-        self._steers_seen = int(on_disk.get("steers") or 0)
+        self._steers_seen = steer_count(on_disk)
         for field in STEER_TURN_FIELDS:
             self.rec[field] = on_disk.get(field)
         # Empty while the steer is still confirming its prompt went in, which is

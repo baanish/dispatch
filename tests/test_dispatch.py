@@ -2277,6 +2277,20 @@ class TestKill(HerdrStubTestCase):
         retried = records.load_record(rec["id"])
         self.assertIs(runner.note_deliverable(retried), False)
 
+    def test_kill_stops_a_worker_whose_record_already_says_done(self):
+        """The record is a file the worker can write in. `done` written there
+        made `kill` decline to touch a CLI that was still running."""
+        rec = self.make_live_record()
+        self.stub.panes[rec["worker_id"]].running = True
+        self.stub.panes[rec["worker_id"]].turn_polls = 10_000
+        rec.update(state="done", rc=0, finished=records.utc_now())
+        (Path(rec["dir"]) / "run.json").write_text(json.dumps(rec), encoding="utf-8")
+        code, output = self.capture_stdout("kill", rec["id"])
+        self.assertEqual(code, cli.EXIT_OK)
+        self.assertIn(("pane", rec["worker_id"]), self.stub.closed)
+        self.assertIn("outlived a record",
+                      (Path(rec["dir"]) / "status.log").read_text(encoding="utf-8"))
+
     def test_kill_reports_the_ending_the_record_holds(self):
         """The watcher can finish the run a moment before the kill lands. The
         record keeps `done`, and the command used to say "killed" anyway."""
