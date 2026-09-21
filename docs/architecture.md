@@ -321,8 +321,10 @@ Two details are worth knowing before reading it:
   that writes its status to `worker.rc`. A background run's launcher exits long
   before its worker does, and only the process that forked a child can read that
   child's status; the file is what any later process can read instead. It is
-  also the completion signal, ahead of pid liveness, because an unreaped pid
-  lingers as a zombie that still answers `kill -0`.
+  also the completion signal, once the relay that writes it has stopped: an
+  unreaped relay lingers as a zombie that still answers `kill -0`, so a zombie
+  counts as stopped, and a status file that appears while the relay is still
+  running was not written by it and ends nothing.
 - **Check-ins run on what exists.** There is no TUI state, so `status` stays
   untracked and `checkin_verdict` judges on CPU in the worker's tree, on whether
   the captured log has grown, and on whether the deliverable is there. Nothing
