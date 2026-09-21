@@ -2224,6 +2224,46 @@ class TestKill(HerdrStubTestCase):
         _, report = self.capture_stdout("wait", rec_id)
         self.assertIn("-- out.md: no answer --", report)
 
+    def test_the_watcher_takes_up_a_turn_that_steer_started(self):
+        """`steer` is another process. The watcher went on holding the previous
+        turn as over and its answer as settled, so it exited the worker during
+        the correction and handed back the old answer."""
+        rec = self.make_live_record()
+        watcher = runner.RunWrapper(herdr.HerdrSubstrate(), dict(rec))
+        watcher.attach()
+        watcher.rec.update(turn_over_at="2026-01-01T00:00:00Z", end_ready_looks=5,
+                           deliverable_seen=[1, 2], deliverable_since=1.0)
+        self.assertFalse(watcher.absorb_steer())
+
+        steered = records.load_record(rec["id"])
+        steered.update(steered=records.utc_now(), steers=1, turn_over_at="",
+                       end_ready_looks=0, deliverable_seen=None,
+                       deliverable_since=0.0, turns=2)
+        records.save_record(steered)
+
+        self.assertTrue(watcher.absorb_steer())
+        self.assertEqual((watcher.rec["turn_over_at"], watcher.rec["end_ready_looks"],
+                          watcher.rec["deliverable_seen"], watcher.rec["turns"]),
+                         ("", 0, None, 2))
+        self.assertFalse(watcher.absorb_steer(), "the same steer taken up twice")
+        self.assertIn("STEER-SEEN",
+                      (Path(rec["dir"]) / "status.log").read_text(encoding="utf-8"))
+
+    def test_steer_marks_the_new_turn_before_it_types(self):
+        rec = self.make_live_record()
+        self.stub.panes[rec["worker_id"]].running = True
+        self.stub.panes[rec["worker_id"]].turn_polls = 10_000
+        seen = []
+        real = runner.RunWrapper.prompt_worker
+
+        def spy(wrapper, text):
+            seen.append(records.load_record(rec["id"]).get("steers"))
+            return real(wrapper, text)
+
+        with patch.object(runner.RunWrapper, "prompt_worker", spy):
+            self.run_cli("steer", rec["id"], "use the other table")
+        self.assertEqual(seen, [1])
+
     def test_a_stale_writer_cannot_change_how_a_run_ended(self):
         """A watcher mid-poll still holds `running` after `kill` wrote `killed`,
         and a late finalizer still holds its own verdict after `done` landed."""

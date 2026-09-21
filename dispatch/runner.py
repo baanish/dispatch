@@ -87,6 +87,12 @@ READY_STATES = ("idle", "done")
 DONE_STATES = ("done",)
 # How long a quiet TUI has to stay quiet before a turn counts as over.
 TURN_SETTLE_SECONDS = 5.0
+# What a steer resets on the record, and what the process watching the run has
+# to take from it instead of writing its own older copy back.
+STEER_TURN_FIELDS = ("steered", "steers", "prompt_state_seq", "turns", "turn_over_at",
+                     "end_ready_looks", "working_looks", "deliverable_seen",
+                     "deliverable_since")
+
 # How many consecutive ready looks make a turn's ending settled rather than the
 # one-look done that surfaces while a queued message is handed over.
 SETTLED_LOOKS = 2
@@ -1686,6 +1692,36 @@ class RunWrapper:
 
     # -- polling ---------------------------------------------------------
 
+    def absorb_steer(self):
+        """Take up the turn another process started with `dispatch steer`.
+
+        `steer` runs in its own process and types into this worker, while the
+        process watching it goes on judging the turn from the copy of the record
+        it holds: the previous answer still settled on disk, the previous turn
+        still over. It would send the exit command into the middle of the
+        correction, return the old answer, and write its stale turn state back
+        over the steer's. So each look checks the record for a steer it has not
+        seen, and starts the turn again from what the steer wrote.
+        """
+        try:
+            on_disk = json.loads((self.dir / "run.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return False
+        if int(on_disk.get("steers") or 0) == int(self.rec.get("steers") or 0):
+            return False
+        for field in STEER_TURN_FIELDS:
+            self.rec[field] = on_disk.get(field)
+        # Empty while the steer is still confirming its prompt went in, which is
+        # not this run going back to owing its brief.
+        self.rec["prompted"] = on_disk.get("prompted") or self.rec.get("prompted")
+        self._prompted_at = time.time()
+        self._worked_since_prompt = False
+        self._second_look_due = False
+        append_status(self.status_path,
+                      f"STEER-SEEN {utc_now()} a new turn; the answer on disk "
+                      "belongs to the last one")
+        return True
+
     def poll(self, deadline_seconds=None, started_at=None, collect=True):
         """One look. None while the worker runs, else (rc, timed_out).
 
@@ -1699,6 +1735,7 @@ class RunWrapper:
         # every question asked about that file below is asked of the local
         # mirror, so the mirror is refreshed first.
         remote.fetch_deliverable(self.rec)
+        self.absorb_steer()
         info = self.substrate.process_info(self.worker)
         if info is None:
             # The shell itself exited: no prompt is left to read a status from.

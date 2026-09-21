@@ -469,12 +469,16 @@ def cmd_steer(args):
     # A steer starts a turn, and turn detection has to know that: the previous
     # turn's deliverable is already on disk, and a watcher that sees it settled
     # would send the exit command into the middle of the correction.
-    wrapper.forget_deliverable()
-    wrapper.prompt_worker(steer_prompt(message))
+    # Stamped before anything is typed: the stamp is how the process watching
+    # this run learns a new turn has begun, and one that landed only after the
+    # prompt left the whole delivery for that watcher to exit the worker in.
     rec["steered"] = utc_now()
+    # Counted as well: two steers inside one second carry the same stamp.
+    rec["steers"] = int(rec.get("steers") or 0) + 1
     rec["deliverable_seen"] = None
     rec["deliverable_since"] = 0.0
     save_record(rec)
+    wrapper.prompt_worker(steer_prompt(message))
     append_status(status_path, f"STEER {utc_now()} delivered")
     print(f"{args.id} steered")
     return EXIT_OK
