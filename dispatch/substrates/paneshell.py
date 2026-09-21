@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import re
 import shlex
+import uuid
 
 from ..processes import IS_WINDOWS
 
@@ -185,3 +186,14 @@ def parse_rc_echo(text, token, after=""):
 def rc_token(run_id):
     """A per-run marker so one pane's echo can never be read as another's."""
     return re.sub(r"[^A-Za-z0-9]", "", str(run_id))[-16:] or "run"
+
+
+def rc_probe_token(run_id):
+    """`rc_token` plus a part nobody could have printed in advance.
+
+    The exit code decides between `done` and `failed`, and it is read off a
+    screen the worker wrote on. With a token it could predict, a worker printed
+    the probe and a `=0` answer before exiting, and a screen read that landed
+    before the real echo took that for the status.
+    """
+    return rc_token(run_id) + uuid.uuid4().hex[:8]

@@ -50,7 +50,8 @@ from ..records import append_status, utc_now
 from .base import (Substrate, SubstrateCapabilities, SubstrateError, SpawnResult,
                    Worker, WorkerProcess, WorkerSetupError)
 from .paneshell import (ENV_MARKER, PANE_SHELL, RC_MARKER, anchor_after,
-                        parse_env_echo, parse_rc_echo, rc_token)
+                        parse_env_echo, parse_rc_echo, rc_probe_token,
+                        rc_token)
 
 SESSION_PREFIX = "dispatch-"
 # tmux takes longer names, but a session name is typed by hand in the attach
@@ -642,7 +643,7 @@ class TmuxSubstrate(Substrate):
         line cannot be mistaken for the answer, because it still reads `=$?`
         where the answer reads `=<n>`.
         """
-        token = rc_token(run_id or worker.id)
+        token = rc_probe_token(run_id or worker.id)
         probe = PANE_SHELL.rc_probe_line(RC_MARKER, token)
         if log_path is not None:
             append_status(log_path,

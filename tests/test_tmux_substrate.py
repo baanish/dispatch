@@ -434,6 +434,20 @@ class TestExitCode(FakeTmuxTestCase):
         self.patch_pane(rc=7, screen=f"dispatch-rc-{token}=99\n")
         self.assertEqual(substrate.read_exit_code(worker, RUN_ID), 7)
 
+    def test_an_answer_printed_before_the_probe_cannot_be_the_exit_code(self):
+        """The worker knows the run id, so it could print the probe and a `=0`
+        ahead of time. The probe carries a part it could not have known."""
+        substrate, worker = self.open_worker()
+        typed = []
+        real = substrate.send_line
+        substrate.send_line = lambda w, line: (typed.append(line), real(w, line))[1]
+        self.patch_pane(rc=7)
+        self.assertEqual(substrate.read_exit_code(worker, RUN_ID), 7)
+        self.assertEqual(substrate.read_exit_code(worker, RUN_ID), 7)
+        self.assertEqual(len(typed), 2)
+        self.assertNotEqual(typed[0], typed[1])
+        self.assertTrue(all(tmux.rc_token(RUN_ID) in line for line in typed))
+
     def test_a_pane_that_never_answers_leaves_the_exit_code_unknown(self):
         substrate, worker = self.open_worker()
         self.patch_pane(swallow=True)
