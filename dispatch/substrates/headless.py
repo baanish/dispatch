@@ -82,6 +82,24 @@ RC_RELAY = ("import os,subprocess,sys; rc=subprocess.call(sys.argv[2:]); "
             "os.close(fd); sys.exit(rc)")
 
 
+# The variables dispatch itself hands a worker. Anything else found in the saved
+# state is not dispatch's, and the state file sits in a directory the worker may
+# be able to write.
+LAUNCH_ENV_NAMES = ("AGENT_DEPTH", "DISPATCH_SESSION", "DISPATCH_RUN")
+
+
+def launch_environment(saved):
+    """The saved launch environment, cut down to what dispatch could have put there.
+
+    A respawn after a CLI self-update starts the relay again from this state, as
+    the operator and outside any sandbox. A `PYTHONPATH` written into it would
+    have that relay import the worker's code, so only dispatch's own markers and
+    blanked keys (empty values, which grant nothing) are carried over.
+    """
+    return {name: value for name, value in (saved or {}).items()
+            if isinstance(value, str) and (name in LAUNCH_ENV_NAMES or value == "")}
+
+
 class HeadlessSubstrate(Substrate):
     """A worker per subprocess, with its output captured to the run directory."""
 
@@ -174,12 +192,12 @@ class HeadlessSubstrate(Substrate):
         with contextlib.suppress(OSError):
             rc_path.unlink()
         env = dict(os.environ)
-        env.update(state.get("env") or {})
+        env.update(launch_environment(state.get("env")))
         # `-P`: the relay's cwd is the task directory, and without it a
         # `subprocess.py` planted there runs as the operator before the CLI starts.
         relay = [resolve_python(), "-P", "-c", RC_RELAY, str(rc_path), binary,
                  *argv[1:]]
-        handle = open(log, "ab")
+        handle = open_append(log)
         try:
             popen = popen_detached(
                 relay, cwd=state.get("cwd") or None, env=env,

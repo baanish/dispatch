@@ -244,6 +244,17 @@ class TestHeadlessLiveness(HeadlessTestCase):
         self.assertEqual(settled["state"], "done", settled.get("error"))
         self.assertEqual(settled["rc"], 0)
 
+    def test_a_respawn_takes_no_environment_the_worker_wrote_into_its_state(self):
+        """worker.json sits in the run directory. A PYTHONPATH added there would
+        have the relay, which runs as the operator, import the worker's code."""
+        from dispatch.substrates import headless
+        kept = headless.launch_environment({
+            "AGENT_DEPTH": "1", "DISPATCH_RUN": "r", "OPENAI_API_KEY": "",
+            "PYTHONPATH": "/tmp/planted", "PATH": "/tmp/planted", "LD_PRELOAD": "x",
+            "DISPATCH_SESSION": 7})
+        self.assertEqual(kept, {"AGENT_DEPTH": "1", "DISPATCH_RUN": "r",
+                                "OPENAI_API_KEY": ""})
+
     def test_a_run_a_watcher_is_driving_is_never_swept_away(self):
         """A held watcher lock is liveness in its own right: it is held for
         exactly as long as somebody is driving that worker."""
