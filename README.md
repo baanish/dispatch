@@ -150,9 +150,13 @@ worker. Caps, the depth limit, and `DISPATCH_HOME` are bookkeeping that a
 cooperative worker respects and a hostile one can step around. Every worker runs
 under your account and can read what you can read, on every lane. A worker's run
 directory under `~/.dispatch/runs/` holds its answer next to dispatch's own
-records; dispatch never writes through a symlink there or at `--out`, and reads
-nothing from the task directory, but a worker that can write in its run
-directory can still corrupt that run's records. Work you consider hostile
+records. dispatch replaces the files it writes there rather than writing through
+them, so a name a worker has turned into a symlink is replaced and not followed;
+on POSIX an append refuses a link outright, and the `--out` copy is anchored by
+inode to the directory recorded at launch, where Windows, which has no
+unprivileged symlinks, checks that path instead. dispatch reads nothing from the
+task directory, but a worker that can write in its run directory can still
+corrupt that run's records. Work you consider hostile
 belongs under a separate account, container, or VM that holds only the checkout
 and the vendor login it needs.
 
