@@ -559,7 +559,11 @@ class HerdrClient:
             body = message["error"]
             raise HerdrCallError(method, body.get("code", "unknown"),
                                  body.get("message", ""))
-        result = message.get("result") or {}
+        # A null result is a call with nothing to say. An empty list or string
+        # is not: read as `{}`, a `pane.list` answering `[]` would list no panes
+        # and the sweep would take every live worker for gone.
+        result = message.get("result")
+        result = {} if result is None else result
         if not isinstance(result, dict):
             raise HerdrError(f"herdr {method} answered with a "
                              f"{type(result).__name__} where its result body "
