@@ -2686,6 +2686,59 @@ class TestRecordLocation(HerdrStubTestCase):
                                    .read_text(encoding="utf-8"))["heartbeat"])
 
 
+class TestWindowsExecutableLookup(unittest.TestCase):
+    """Windows resolves a bare executable name against the caller's current
+    directory before any system or PATH directory, and dispatch's current
+    directory is whichever checkout the operator aimed a run at."""
+
+    def test_only_the_absolute_path_entries_are_searched(self):
+        with patch.dict(os.environ, {"PATH": os.pathsep.join(
+                ["", "tools", os.curdir, "/opt/bin"])}):
+            self.assertEqual(processes.path_entries(), [os.getcwd(), "/opt/bin"])
+
+    def test_a_bare_name_never_resolves_into_the_current_directory(self):
+        searched = []
+
+        def found_in_the_checkout(name, path=None):
+            searched.append(path)
+            return os.path.join(os.curdir, name)
+
+        with patch.object(processes, "IS_WINDOWS", True), \
+                patch.object(processes.shutil, "which", found_in_the_checkout), \
+                patch.dict(os.environ, {"PATH": os.pathsep.join(["rel", "/opt/bin"])}):
+            self.assertIsNone(processes.which_absolute("codex.exe"))
+        self.assertEqual(searched, ["/opt/bin"])
+
+    def test_the_watcher_interpreter_is_never_the_one_beside_the_brief(self):
+        """A python.exe in the checkout would run the detached watcher, which is
+        the operator's own process."""
+        probed = []
+
+        def probe(argv, **kwargs):
+            probed.append(argv[0])
+            return subprocess.CompletedProcess(argv, 0, "Python 3.11.0", "")
+
+        with patch.object(processes, "IS_WINDOWS", True), \
+                patch.object(processes.shutil, "which",
+                             lambda name, path=None: os.path.join(os.curdir, name)), \
+                patch.object(processes.subprocess, "run", probe), \
+                patch("sys.executable", r"C:\WindowsApps\python.exe"), \
+                patch.dict(os.environ, {"PATH": "/opt/bin"}), \
+                self.assertRaises(errors.DispatchError):
+            processes.resolve_python()
+        self.assertEqual(probed, [])
+
+    def test_a_force_kill_runs_the_system_taskkill(self):
+        ran = []
+        with patch.object(processes, "IS_WINDOWS", True), \
+                patch.object(processes.subprocess, "run",
+                             lambda argv, **kwargs: ran.append(argv)), \
+                patch.dict(os.environ, {"SystemRoot": "/sysroot"}):
+            processes.kill_pid(4242)
+        self.assertEqual(ran[0][0],
+                         os.path.join("/sysroot", "System32", "taskkill.exe"))
+
+
 class TestRunArtifactOpens(HerdrStubTestCase):
     """One run's leaves must not stall or abort the bookkeeping every run shares."""
 

@@ -45,13 +45,12 @@ from __future__ import annotations
 import contextlib
 import json
 import os
-import shutil
 import subprocess
 
 from ..errors import DispatchError
 from ..processes import (descendant_pids, pid_alive, pid_is_zombie, popen_detached,
                          pids_cpu_percent, resolve_python, stop_pid,
-                         stop_process_group)
+                         stop_process_group, which_absolute)
 from ..policy import policy
 from ..records import (open_append, read_tail_bytes, replace_text, run_dir,
                        runs_root)
@@ -208,7 +207,7 @@ class HeadlessSubstrate(Substrate):
         sentence rather than a traceback in the worker's log.
         """
         state = self.read_state(worker)
-        binary = shutil.which(argv[0]) if argv else ""
+        binary = which_absolute(argv[0]) if argv else ""
         if not binary:
             raise SubstrateError(
                 f"{(argv or ['?'])[0]} is not on PATH; the {driver.name} lane "

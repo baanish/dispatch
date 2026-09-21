@@ -10,6 +10,7 @@ signalled.
 from __future__ import annotations
 
 import os
+import shutil
 import signal
 import subprocess
 import sys
@@ -46,6 +47,46 @@ def checked_pid(pid):
     if type(pid) is not int or not 1 < pid <= MAX_PID:
         return None
     return pid
+
+
+def windows_system_path(name):
+    """An OS helper by full path, because Windows would otherwise find it here.
+
+    CreateProcess resolves a bare name against the calling process's current
+    directory before any system directory, and dispatch's current directory is
+    whichever checkout the operator aimed a run at.
+    """
+    return os.path.join(os.environ.get("SystemRoot") or r"C:\Windows",
+                        "System32", name)
+
+
+def path_entries():
+    """PATH as absolute directories, dropping the relative ones.
+
+    A relative entry resolves against the current directory, which is the task
+    checkout. One naming it outright is the operator's own choice and is kept.
+    """
+    found = []
+    for entry in (os.environ.get("PATH") or "").split(os.pathsep):
+        if entry == os.curdir:
+            found.append(os.getcwd())
+        elif entry and os.path.isabs(entry):
+            found.append(entry)
+    return found
+
+
+def which_absolute(name):
+    """An executable found on PATH alone, as an absolute path, or None.
+
+    `shutil.which` on Windows searches the current directory ahead of whatever
+    search path it is handed, so passing it a clean PATH is not enough on its
+    own: the relative answer that search produces is what gets rejected here.
+    POSIX has no such rule and keeps plain `which`.
+    """
+    if not IS_WINDOWS:
+        return shutil.which(name)
+    found = shutil.which(name, path=os.pathsep.join(path_entries()))
+    return found if found and os.path.isabs(found) else None
 
 
 def popen_detached(argv, **kwargs):
@@ -132,7 +173,8 @@ def kill_pid(pid):
         return
     try:
         if IS_WINDOWS:
-            subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)],
+            subprocess.run([windows_system_path("taskkill.exe"),
+                            "/F", "/T", "/PID", str(pid)],
                            stdin=subprocess.DEVNULL,
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                            check=False)
@@ -305,14 +347,19 @@ def resolve_python():
         candidates.append(sys.executable)
     candidates += ["python3.exe", "python.exe", "py.exe"]
     for candidate in candidates:
+        # The probe below runs the candidate, so a bare name has to become a
+        # path off PATH before it is run, not after it has answered.
+        binary = candidate if os.path.isabs(candidate) else which_absolute(candidate)
+        if not binary:
+            continue
         try:
-            probe = subprocess.run([candidate, "--version"], stdin=subprocess.DEVNULL,
+            probe = subprocess.run([binary, "--version"], stdin=subprocess.DEVNULL,
                                    capture_output=True, text=True, timeout=10,
                                    check=False)
         except (OSError, subprocess.SubprocessError):
             continue
         blob = (probe.stdout or "") + (probe.stderr or "")
         if probe.returncode == 0 and blob.strip().startswith("Python 3"):
-            return candidate
+            return binary
     from .errors import DispatchError
     raise DispatchError("no working python3 found (the WindowsApps stub does not count)")
