@@ -254,7 +254,11 @@ def live_records(sweep=None):
         # background run whose substrate cannot list workers is abandoned the
         # moment its reservation goes stale, out from under the watcher.
         if run_is_live(rec, ids if mine else None) or watched:
-            if reconcile and mine and not watched and run_never_started(rec):
+            if reconcile and mine and not watched and run_never_started(rec) \
+                    and not reserved_recently(rec):
+                # Not while the reservation is fresh: it is published a moment
+                # before its owner lock is taken, and a sweep from another
+                # command in between would abandon a run that is being launched.
                 sweep.abandon(rec, ids)
                 continue
             if reconcile and mine and rec.get("worker_id") and not watched:

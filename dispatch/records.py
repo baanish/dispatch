@@ -473,18 +473,19 @@ def runs_lock():
         return
     home = dispatch_home()
     home.mkdir(parents=True, exist_ok=True)
-    # Never entered without the lock. A blocking acquire still comes back empty:
-    # Windows gives up after ten one-second tries, and a holder can be inside a
-    # reconcile for longer than that.
-    give_up = time.time() + RUNS_LOCK_SECONDS
-    handle = lock_handle(home / "runs.lock", blocking=True)
+    # Never entered without the lock, and never waited on without an end: asked
+    # for again and again rather than blocked on, because a blocking acquire has
+    # no timeout on POSIX and a short fixed one on Windows, and a holder can be
+    # inside a reconcile for a while.
+    give_up = time.monotonic() + RUNS_LOCK_SECONDS
+    handle = lock_handle(home / "runs.lock", blocking=False)
     while handle is None:
-        if time.time() >= give_up:
+        if time.monotonic() >= give_up:
             raise DispatchError(
                 f"could not take {home / 'runs.lock'} in {RUNS_LOCK_SECONDS}s; "
                 "refusing to count or change runs without it")
-        time.sleep(0.1)
-        handle = lock_handle(home / "runs.lock", blocking=True)
+        time.sleep(0.05)
+        handle = lock_handle(home / "runs.lock", blocking=False)
     _runs_lock_owner, _runs_lock_depth = me, 1
     try:
         yield

@@ -511,10 +511,7 @@ def cmd_status(args):
         return EXIT_OK
     # Reading status is also what settles detached runs: no supervisor process
     # exists to do it, so the operator looking is the trigger.
-    # Under the runs lock, like the sweep a reservation makes: a run that was
-    # reserved a moment ago has no owner lock yet, and a sweep that met it
-    # outside the lock abandoned it as one whose launcher had died.
-    with contextlib.suppress(SubstrateError, OSError), runs_lock():
+    with contextlib.suppress(SubstrateError, OSError):
         live_records(sweep())
     records = all_records()
     rows = []
