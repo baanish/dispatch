@@ -349,13 +349,21 @@ def cmd_continue(args):
         # read the same parent pointer, and without it both adopted the one
         # home: two prompts typed into it, and one run closing it under the
         # other. The older claim wins and the newer run ends here.
-        child["adopts_worker"] = inspected.id
-        save_record(child)
-        first = inspect_home_claimants(inspected.id)[0]
-        if first["id"] != child["id"]:
+        # Checked and claimed in one step under the runs lock, so whichever
+        # `continue` gets there first holds the home and the other sees its claim.
+        with runs_lock():
+            holders = inspect_home_claimants(inspected.id, child["id"])
+            closed = load_record(rec["id"]).get("inspect_worker") != inspected.id
+            if not holders and not closed:
+                child["adopts_worker"] = inspected.id
+                save_record(child)
+        if holders or closed:
             error = DispatchError(
-                f"{first['id']} is already running a turn in {args.id}'s inspect "
-                f"home; `dispatch steer {first['id']}` corrects it, or wait for it")
+                f"{args.id}'s inspect home was closed while this was starting; "
+                f"run `dispatch continue {args.id}` again" if not holders else
+                f"{holders[0]['id']} is already running a turn in {args.id}'s "
+                f"inspect home; `dispatch steer {holders[0]['id']}` corrects it, "
+                "or wait for it")
             RunWrapper(substrate, child).abandon(error)
             release_run_lock(handle)
             raise error
@@ -1438,16 +1446,20 @@ def close_inspect_worker(rec, substrate):
     if not worker_id:
         print(f"{rec['id']} has no inspect home open")
         return EXIT_OK
-    claimants = inspect_home_claimants(worker_id, rec["id"])
-    if claimants:
-        raise DispatchError(
-            f"{claimants[0]['id']} is running a turn in that home and closes it "
-            f"when it ends; `dispatch kill {claimants[0]['id']}` stops it now")
-    substrate.close(Worker(id=worker_id, group=rec.get("inspect_group", "")),
-                    release=False)
-    rec["inspect_worker"] = ""
-    rec["inspect_group"] = ""
-    save_record(rec)
+    # Under the same lock a `continue` claims the home under, and the pointer is
+    # cleared before the lock is let go, so a claim cannot land on a home that is
+    # being closed.
+    group = rec.get("inspect_group", "")
+    with runs_lock():
+        claimants = inspect_home_claimants(worker_id, rec["id"])
+        if claimants:
+            raise DispatchError(
+                f"{claimants[0]['id']} is running a turn in that home and closes "
+                f"it when it ends; `dispatch kill {claimants[0]['id']}` stops it now")
+        rec["inspect_worker"] = ""
+        rec["inspect_group"] = ""
+        save_record(rec)
+    substrate.close(Worker(id=worker_id, group=group), release=False)
     append_status(Path(rec["dir"]) / "status.log", f"INSPECT-CLOSED {utc_now()}")
     print(f"{rec['id']} inspect home {worker_id} closed; reopen it any time with "
           f"`dispatch inspect {rec['id']}`")
