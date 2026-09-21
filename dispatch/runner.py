@@ -546,10 +546,14 @@ def schema_error(rec):
 
 
 def finalize_schema(rec):
-    """Record whether the contract was met, once the worker is gone.
+    """Settle whether the contract was met, on the record `finish` is about to
+    publish.
 
-    The repair rounds already happened in-session; this is the honest journaling
-    of what came out the other side.
+    Before it is published, not after: a verdict that lands later leaves a
+    window in which a waiter reads `done` and exits 0 on JSON that does not
+    parse, and a run settled by a reconcile never got the verdict at all. The
+    repair rounds already happened in-session; this is the honest journaling of
+    what came out the other side.
     """
     if not rec.get("schema"):
         return rec
@@ -560,7 +564,6 @@ def finalize_schema(rec):
         rec["error"] = (f"schema not satisfied after {SCHEMA_REPAIR_ROUNDS} "
                         f"repair rounds: {error}")
         append_status(Path(rec["dir"]) / "status.log", f"SCHEMA-INVALID {utc_now()}")
-    save_final_record(rec)
     return rec
 
 
@@ -2380,6 +2383,7 @@ class RunWrapper:
             # The respawn loop is why this run failed; "exited rc=0 with no
             # deliverable" is only what the last of those launches looked like.
             self.rec["error"] = self.rec["update_error"]
+        finalize_schema(self.rec)
         self.rec["finished"] = utc_now()
         self.rec["closed_by"] = "runner"
         if self.rec.get("out_copy"):
@@ -2430,7 +2434,7 @@ def execute_run(rec, substrate, deadline_seconds=None, poll_seconds=None,
         # nothing left to move it along.
         wrapper.abandon(exc)
         raise
-    return finalize_schema(rec)
+    return rec
 
 
 def spawn_detached_watcher(rec):

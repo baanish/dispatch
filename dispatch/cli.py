@@ -41,7 +41,7 @@ from .records import (COMPLETE_MARKER, RunOptions, all_records, append_status,
                       save_record,
                       stamp_epoch, utc_now, validate_run_id)
 from .runner import (STEER_INTERRUPT_SECONDS, RunWrapper, SubstrateSweep,
-                     checkin_count, execute_run, finalize_output, finalize_schema,
+                     checkin_count, execute_run, finalize_output,
                      judge_liveness, prepare_run, reconcile_run, record_worker,
                      refresh_session_id, run_agent_name, start_run_background,
                      warn_metered_key)
@@ -1487,7 +1487,6 @@ def cmd_watch_run(args):
                             or parse_deadline(policy().default_deadline))
     finally:
         release_run_lock(handle)
-    rec = finalize_schema(rec)
     append_status(Path(rec["dir"]) / "status.log",
                   f"COMPLETE {utc_now()} state={rec['state']} "
                   f"out={Path(rec['dir']) / 'out.md'}")

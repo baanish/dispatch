@@ -2291,6 +2291,21 @@ class TestAbort(HerdrStubTestCase):
         self.assertEqual(rec["state"], "failed")
         self.assertIn("schema not satisfied", rec["error"])
 
+    def test_bad_json_is_never_published_as_done_first(self):
+        """The verdict used to land after the terminal record, so a waiter could
+        read `done` and exit 0 in between, and a reconciled run kept it."""
+        published = []
+        real = runner.save_final_record
+
+        def spy(rec):
+            published.append(rec.get("state"))
+            return real(rec)
+
+        self.stub.reply = "still not json"
+        with patch.object(runner, "save_final_record", side_effect=spy):
+            self.run_cli("run", str(self.brief), "--schema", str(self.schema_file()))
+        self.assertEqual(published, ["failed"])
+
     def test_repair_rounds_are_capped(self):
         self.stub.reply = "never json"
         self.run_cli("run", str(self.brief), "--schema", str(self.schema_file()))
