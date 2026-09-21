@@ -494,6 +494,20 @@ class TestSpawnPath(HerdrTestCase):
         self.assertIn("unsupported_agent_kind", spawn.error)
         self.assertIn("Investigate before the next batch", spawn.flag)
 
+    def test_a_spawn_whose_answer_was_lost_is_not_typed_into(self):
+        """An `agent start` that fails after the pane has a process running may
+        only have lost its answer, and the lane argv typed at a CLI that is
+        already up is submitted to it as a prompt."""
+        self.stub.errors["agent.start"] = ERRORS["unsupported_agent_kind"]
+        self.stub.pane(self.pane_id).running = True
+        spawn = self.substrate().start_worker(
+            self.worker_with_agent(), drivers.get_driver("codex"),
+            ["codex", "-m", "gpt-5.6-sol"])
+        self.assertEqual(spawn.method, "agent.start")
+        self.assertIn("HERDR SPAWN UNCONFIRMED", spawn.flag)
+        self.assertIn("unsupported_agent_kind", spawn.error)
+        self.assertNotIn("pane.send_text", self.methods())
+
     def test_fallback_argv_is_quoted_for_the_shell(self):
         self.stub.errors["agent.start"] = ERRORS["unsupported_agent_kind"]
         self.substrate().start_worker(

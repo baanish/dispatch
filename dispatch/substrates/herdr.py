@@ -128,6 +128,14 @@ FALLBACK_FLAG = (
     "herdr never detected the agent: its pane wall, prompting, and detection are "
     "degraded for this run. Investigate before the next batch.")
 
+UNCONFIRMED_FLAG = (
+    "HERDR SPAWN UNCONFIRMED: `agent start` on pane {pane} failed after the "
+    "pane had already started a process: {error}. dispatch adopted what is "
+    "running rather than typing the lane argv into it, so the run continues "
+    "but herdr may never have detected the agent: its pane wall, prompting, "
+    "and detection may be degraded for this run. Investigate before the next "
+    "batch.")
+
 DRIFT_MESSAGE = (
     "herdr protocol drift: expected {expected}, got {actual}; finish the run by "
     "hand if it is urgent, and update dispatch's pinned protocol")
@@ -1007,8 +1015,18 @@ class HerdrSubstrate(Substrate):
             return spawn
         except HerdrError as exc:
             error = getattr(exc, "message", "") or str(exc)
-            spawn.method = "send-text"
             spawn.error = f"{getattr(exc, 'code', 'error')}: {error}"
+            # A lost answer is not a lost spawn: the CLI may be up already, and
+            # typing the lane command then submits it as that CLI's own input.
+            # Only a pane back at its shell prompt can be typed into.
+            info = self.process_info(worker)
+            if info is not None and info.child_pids:
+                spawn.flag = UNCONFIRMED_FLAG.format(pane=worker.id,
+                                                     error=spawn.error)
+                return spawn
+            if info is None or not info.at_prompt:
+                raise
+            spawn.method = "send-text"
             spawn.flag = FALLBACK_FLAG.format(kind=kind, pane=worker.id,
                                               error=spawn.error)
         # Raw primitives. If these fail too there is no substrate left, so that

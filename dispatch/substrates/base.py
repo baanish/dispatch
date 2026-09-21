@@ -112,7 +112,7 @@ class SpawnResult:
     method: str = ""       # the substrate's own spawn, or the typed fallback
     argv: list = field(default_factory=list)
     error: str = ""
-    flag: str = ""         # non-empty exactly when the fallback fired
+    flag: str = ""         # non-empty exactly when the spawn was not clean
     alive: bool = True
 
 
