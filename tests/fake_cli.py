@@ -33,11 +33,13 @@ NOTE = "fake-cli: starting"
 def prompt_of(name, argv):
     """The brief this launch was handed.
 
-    `claude -p <prompt>` puts it behind its own flag; `codex exec` and grok both
-    take it as the last argument.
+    `claude -p <prompt>` and `grok --single <prompt>` put it behind their own
+    flag; `codex exec` takes it as the last argument.
     """
     if name == "claude" and "-p" in argv:
         return argv[argv.index("-p") + 1]
+    if name == "grok" and "--single" in argv:
+        return argv[argv.index("--single") + 1]
     return argv[-1] if argv else ""
 
 

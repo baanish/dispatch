@@ -123,8 +123,8 @@ class TestLanes(HerdrStubTestCase):
         self.assertEqual(claude[:3], ["claude", "-p", "read /p.txt"])
         grok = drivers.get_driver("grok").headless_argv(
             lanes.resolve_lane("grok@high"), opts, "read /p.txt")
-        self.assertEqual(grok[:3], ["grok", "--output-format", "text"])
-        self.assertEqual(grok[-1], "read /p.txt")
+        self.assertEqual(grok[:3], ["grok", "--output-format", "plain"])
+        self.assertEqual(grok[-2:], ["--single", "read /p.txt"])
 
     def test_headless_codex_write_sets_approvals_by_config_override(self):
         """`codex exec` has no `-a`: it exits 2 on the flag, fresh or resumed."""

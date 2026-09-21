@@ -327,7 +327,7 @@ Two details are worth knowing before reading it:
 
 Where `out.md` comes from differs per driver, and the driver's `headless_argv`
 is where that is decided: codex is told to write the deliverable itself with
-`exec -o`; claude (`-p`) and grok (`--output-format text`) print their final
+`exec -o`; claude (`-p`) and grok (`--single`) print their final
 message on stdout, so it lands in `pane.log` and the runner's own salvage copies
 it into `out.md` when the worker wrote no file.
 

@@ -61,11 +61,13 @@ class GrokDriver(Driver):
 
     def headless_argv(self, lane, opts, prompt_text, out_path="", session_id="",
                       resume_session=""):
-        """The non-interactive form: `--output-format text` and a prompt argument.
+        """The non-interactive form: `--single` prints one answer and exits.
 
-        There is no output-file flag, so the headless substrate captures stdout.
+        A bare prompt argument opens the TUI on it instead, so the one-shot
+        entry point is the flag. There is no output-file flag, so the headless
+        substrate captures stdout.
         """
-        argv = ["grok", "--output-format", "text",
+        argv = ["grok", "--output-format", "plain",
                 "-m", lane.model,
                 "--reasoning-effort", lane.effort,
                 "--permission-mode", "auto",
@@ -77,7 +79,7 @@ class GrokDriver(Driver):
             argv += [f"--resume={validate_session_id(resume_session)}"]
         elif session_id:
             argv += ["--session-id", validate_session_id(session_id)]
-        return argv + ["--cwd", opts.dir, prompt_text]
+        return argv + ["--cwd", opts.dir, "--single", prompt_text]
 
     def validate_options(self, lane, opts):
         if opts.write:

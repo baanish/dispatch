@@ -34,7 +34,7 @@ Where `out.md` comes from, per driver:
 
 - codex: `codex exec -o <path>` writes the final message to the deliverable
   itself, so nothing has to be extracted from the output.
-- claude (`-p`) and grok (`--output-format text`) print their final message on
+- claude (`-p`) and grok (`--single`) print their final message on
   stdout, which lands in `pane.log`. Every brief already asks the worker to
   write `out.md`; when one does not, the runner's own salvage copies the
   captured output there.

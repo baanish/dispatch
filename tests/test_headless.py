@@ -103,7 +103,7 @@ class TestHeadlessRun(HeadlessTestCase):
     def test_every_driver_runs_its_own_one_shot_form(self):
         for lane, head in (("sol@medium", ["codex", "exec"]),
                            ("opus@high", ["claude", "-p"]),
-                           ("grok@high", ["grok", "--output-format", "text"])):
+                           ("grok@high", ["grok", "--output-format", "plain"])):
             with self.subTest(lane=lane):
                 code, _ = self.capture_stdout("run", lane, str(self.brief))
                 rec = [r for r in records.all_records() if r["lane"] == lane][0]
