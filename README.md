@@ -321,7 +321,7 @@ session = 4                     # live workers from one orchestrating session
 [policy]
 default_deadline = "30m"        # check-in interval when --deadline is absent
 human_hand_timeout = "30m"      # wait at a dialog only a human can answer; "forever" allowed
-blank_metered_keys = false      # blank the driver's API-key variables, keeping a subscription lane on its subscription
+blank_metered_keys = false      # blank the driver's listed credential variables in the worker's environment
 depth1_lanes = ["astra"]        # lane keys, each at any effort; omit to take the `light` slot's key
 
 [lanes.astra]                   # a [lanes] table replaces the built-in set wholesale
@@ -382,6 +382,11 @@ run is judged on signals that cost nothing (screen movement, CPU, whether the
 deliverable exists), and a working worker is bought another interval. Only a
 demonstrably dead, stuck, or blocked one is ended, so `--deadline` caps no
 runtime.
+
+Metered key blanking empties the driver's listed credential variables in the
+environment the worker is launched with. That is all it does: which account a
+run is billed to is still decided by every other credential source, a CLI's own
+stored login and any credential file included.
 
 The depth ladder is enforced against the environment rather than a config file.
 A worker inherits `AGENT_DEPTH` from whatever spawned it, a depth-1 worker may
