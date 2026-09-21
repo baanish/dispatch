@@ -2250,6 +2250,42 @@ class TestKill(HerdrStubTestCase):
         self.assertIn("STEER-SEEN",
                       (Path(rec["dir"]) / "status.log").read_text(encoding="utf-8"))
 
+    def test_a_stale_save_cannot_erase_a_steer_before_the_watcher_sees_it(self):
+        """The watcher saves its copy of the record all the time. One of those
+        saves landing between the steer and the watcher's next look used to put
+        the old turn back, and the steer was never seen at all."""
+        rec = self.make_live_record()
+        watcher = runner.RunWrapper(herdr.HerdrSubstrate(), dict(rec))
+        watcher.attach()
+        watcher.rec.update(turn_over_at="2026-01-01T00:00:00Z", end_ready_looks=5)
+
+        steered = records.load_record(rec["id"])
+        steered.update(steered=records.utc_now(), steers=1, turn_over_at="",
+                       end_ready_looks=0)
+        records.save_record(steered)
+        records.save_record(watcher.rec)            # the stale save
+
+        self.assertEqual(records.load_record(rec["id"])["steers"], 1)
+        self.assertTrue(watcher.absorb_steer())
+        self.assertEqual(watcher.rec["turn_over_at"], "")
+
+    def test_the_answer_from_before_a_steer_cannot_end_the_new_turn(self):
+        rec = self.make_live_record()
+        out = Path(rec["dir"]) / "out.md"
+        out.write_text("the first answer", encoding="utf-8")
+        found = out.stat()
+        rec["stale_deliverable"] = [found.st_size, found.st_mtime]
+        records.save_record(rec)
+        watcher = runner.RunWrapper(herdr.HerdrSubstrate(), rec)
+        watcher.attach()
+        with patch.object(runner, "DELIVERABLE_QUIET_SECONDS", 0):
+            self.assertFalse(watcher.deliverable_is_settled())
+            self.assertFalse(watcher.deliverable_is_settled())
+            out.write_text("the corrected answer", encoding="utf-8")
+            os.utime(out, (found.st_atime + 5, found.st_mtime + 5))
+            watcher.deliverable_is_settled()
+            self.assertTrue(watcher.deliverable_is_settled())
+
     def test_steer_marks_the_new_turn_before_it_types(self):
         rec = self.make_live_record()
         self.stub.panes[rec["worker_id"]].running = True

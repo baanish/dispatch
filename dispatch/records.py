@@ -292,6 +292,11 @@ def save_record(rec):
         atomic_replace(tmp, path)
 
 
+# What `steer` resets on the record when it starts a new turn in a live worker.
+STEER_TURN_FIELDS = ("steered", "steers", "stale_deliverable", "prompt_state_seq",
+                     "turns", "turn_over_at", "end_ready_looks", "working_looks",
+                     "deliverable_seen", "deliverable_since")
+
 # How a run ended. Written once, by whoever ended it, and carried by every
 # later write of that record.
 OUTCOME_FIELDS = ("state", "rc", "finished", "closed_by", "error")
@@ -314,6 +319,11 @@ def keep_the_ending_on_disk(rec, path):
         on_disk = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return
+    if int(on_disk.get("steers") or 0) > int(rec.get("steers") or 0):
+        # The same staleness at the start of a turn: `steer` runs in its own
+        # process, and the watcher's next save would put the old turn back.
+        for field in STEER_TURN_FIELDS:
+            rec[field] = on_disk.get(field)
     ended = on_disk.get("state")
     if ended in policy().terminal_states and ended != "orphaned":
         for field in OUTCOME_FIELDS:

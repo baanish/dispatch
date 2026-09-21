@@ -41,7 +41,8 @@ from .errors import DispatchError
 from .policy import (DEPTH_ENV, child_depth, current_depth, hand_timeout_seconds,
                      parse_deadline, policy)
 from .processes import popen_detached, resolve_python
-from .records import (ABORT_MARKER, HEARTBEAT_SECONDS, append_status,
+from .records import (ABORT_MARKER, HEARTBEAT_SECONDS, STEER_TURN_FIELDS,
+                      append_status,
                       deliverable_path, hold_run_lock, new_run_id, out_copy_dir,
                       out_copy_path, read_output, release_run_lock, replace_text,
                       run_dir, save_final_record, save_heartbeat, save_record,
@@ -87,12 +88,6 @@ READY_STATES = ("idle", "done")
 DONE_STATES = ("done",)
 # How long a quiet TUI has to stay quiet before a turn counts as over.
 TURN_SETTLE_SECONDS = 5.0
-# What a steer resets on the record, and what the process watching the run has
-# to take from it instead of writing its own older copy back.
-STEER_TURN_FIELDS = ("steered", "steers", "prompt_state_seq", "turns", "turn_over_at",
-                     "end_ready_looks", "working_looks", "deliverable_seen",
-                     "deliverable_since")
-
 # How many consecutive ready looks make a turn's ending settled rather than the
 # one-look done that surfaces while a queued message is handed over.
 SETTLED_LOOKS = 2
@@ -737,6 +732,7 @@ class RunWrapper:
         # Enters put into a handed-back trust dialog this run, capped.
         self._trust_attempts = 0
         self._prompted_at = 0.0
+        self._steers_seen = int(rec.get("steers") or 0)
         self._worked_since_prompt = False
         self._settled_since = None
         # What the substrate said on the last look, so the end-of-run condition
@@ -1706,8 +1702,12 @@ class RunWrapper:
             on_disk = json.loads((self.dir / "run.json").read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return False
-        if int(on_disk.get("steers") or 0) == int(self.rec.get("steers") or 0):
+        # Against what this process has taken up, not against its copy of the
+        # record: a save in between carries the steer's fields into that copy,
+        # and the turn still has to be started again here.
+        if int(on_disk.get("steers") or 0) == self._steers_seen:
             return False
+        self._steers_seen = int(on_disk.get("steers") or 0)
         for field in STEER_TURN_FIELDS:
             self.rec[field] = on_disk.get(field)
         # Empty while the steer is still confirming its prompt went in, which is
@@ -2094,6 +2094,10 @@ class RunWrapper:
         # Through JSON, so a list: a tuple would come back unequal to itself
         # after one save-and-load round trip.
         signature = [stat.st_size, stat.st_mtime]
+        if signature == list(self.rec.get("stale_deliverable") or []):
+            # The answer from before a steer, untouched since. The new turn has
+            # written nothing yet, however long this file has been quiet.
+            return self.forget_deliverable()
         if list(self.rec.get("deliverable_seen") or []) != signature:
             self.rec["deliverable_seen"] = signature
             self.rec["deliverable_since"] = time.time()

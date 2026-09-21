@@ -36,6 +36,7 @@ from .policy import current_depth, enforce_depth, parse_deadline, policy
 from .processes import stop_pid
 from .prompt import steer_prompt
 from .records import (COMPLETE_MARKER, RunOptions, all_records, append_status,
+                      deliverable_path,
                       hold_run_lock, last_heartbeat_age, load_record, read_output,
                       read_status_head, read_tail_bytes, read_text, replace_text,
                       release_run_lock, runs_lock, runs_root, sanitize_log_line,
@@ -476,6 +477,11 @@ def cmd_steer(args):
     rec["steered"] = utc_now()
     # Counted as well: two steers inside one second carry the same stamp.
     rec["steers"] = int(rec.get("steers") or 0) + 1
+    # The answer already on disk belongs to the turn being corrected. Noted by
+    # size and time, so it cannot end the new turn unless the worker rewrites it.
+    with contextlib.suppress(OSError):
+        old = deliverable_path(rec).stat()
+        rec["stale_deliverable"] = [old.st_size, old.st_mtime]
     rec["deliverable_seen"] = None
     rec["deliverable_since"] = 0.0
     save_record(rec)
