@@ -1,7 +1,9 @@
-"""`dispatch doctor`: whether this machine can actually run the configured board.
+"""`dispatch doctor`: the local CLI checks, and the ssh check per machine.
 
-Three questions, and no more: is each lane's CLI installed and logged in, is
-each machine reachable, and which substrate would a run land in. Everything it
+Three questions, and no more: is each lane's CLI installed and logged in here,
+which is asked of a machine-pinned lane's driver too; does ssh reach each
+machine and, in dispatch mode, answer `<dispatch> --version` over there; and
+which substrate would a run land in. Everything it
 runs is non-interactive, bounded by a timeout, and started with stdin closed. A
 vendor CLI opened on a terminal here would sit at its TUI forever, and a probe
 that costs a model call is not a health check.

@@ -268,9 +268,9 @@ def cmd_run(args):
             # already names them by their paths there.
             stage_or_fail(rec, substrate)
         if opts.bg:
-            # No detached supervisor: the worker's home is the background
-            # process, and its deadline and exit code are settled by the next
-            # command that reads runs.
+            # A detached watcher drives the run from here on. If it exits
+            # before recording the ending, the next command that reads runs
+            # reconciles what it left behind.
             rec = start_run_background(rec, substrate)
             print(rec["id"])
             print(rec["dir"])

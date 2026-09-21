@@ -255,8 +255,8 @@ def checkin_verdict(signals, worker_status, deliverable_seen, prior_reviews,
     """`working` | `blocked` | `dead` | `stuck` | `review`, for a run at its deadline.
 
     Pure, so the ladder that decides whether to end a run can be read and tested
-    without a worker. Only the first four kill; `review` says the signals
-    disagree, and its answer is always to keep the home and look again.
+    without a worker. Only `blocked`, `dead`, and `stuck` kill; `review` says the
+    signals disagree, and its answer is always to keep the home and look again.
 
     `prior_reviews` is how many check-ins in a row have already come back
     ambiguous, which is what makes "blocked or stuck across two consecutive

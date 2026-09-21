@@ -15,7 +15,7 @@ terminal multiplexer.
 | `dispatch/lanes.py` | The lane grammar `key@effort[:tier]`, and the default lane table config replaces. |
 | `dispatch/config.py` | The user TOML file, its validation, the presets, and `init`. |
 | `dispatch/board.py` | The five role slots, and the table `dispatch board` prints. |
-| `dispatch/doctor.py` | Whether this machine can run the configured board. |
+| `dispatch/doctor.py` | The local CLI check per lane, and per machine an ssh check and the remote dispatch's version. |
 | `dispatch/records.py` | The run directory and `run.json`: ids, atomic writes, advisory locks, `status.log`, `RunOptions`. |
 | `dispatch/policy.py` | Values a user can change: caps, deadlines, the hand-wait timeout, metered key blanking, the depth ladder. |
 | `dispatch/caps.py` | Liveness of a record, and the check-and-reserve that enforces both caps under one lock. |
