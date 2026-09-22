@@ -929,6 +929,10 @@ class HerdrStubTestCase(unittest.TestCase):
         # carries no cwd, so a rollout a real codex wrote on this machine while
         # the suite ran handed an inspect-refusal test a session id to reopen.
         os.environ["CODEX_HOME"] = str(self.root / "codex")
+        # pi's session store, for the same reason: a pi run's transcript is
+        # searched for by id under this directory, and the machine's own store
+        # is both the operator's and large enough for that walk to be felt.
+        os.environ["PI_CODING_AGENT_DIR"] = str(self.root / "pi")
         # An empty file rather than an absent one: `dispatch` reads the
         # operator's config at startup, and a suite that fell through to the
         # real `~/.config/dispatch/config.toml` would run on that machine's

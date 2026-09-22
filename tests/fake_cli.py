@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """A stand-in for a vendor CLI's one-shot mode, copied onto PATH as codex,
-claude, and grok.
+claude, grok, and pi.
 
 It models what a real headless worker does and nothing else: it finds the
 deliverable path in the prompt it was handed, writes its answer there, prints
@@ -34,7 +34,7 @@ def prompt_of(name, argv):
     """The brief this launch was handed.
 
     `claude -p <prompt>` and `grok --single <prompt>` put it behind their own
-    flag; `codex exec` takes it as the last argument.
+    flag; `codex exec` and `pi -p` take it as the last argument.
     """
     if name == "claude" and "-p" in argv:
         return argv[argv.index("-p") + 1]

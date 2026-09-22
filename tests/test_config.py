@@ -516,6 +516,14 @@ class TestInit(ConfigTestCase):
         self.assertTrue(any("balanced" in line for line in lines))
         self.assertTrue(any(str(installed) in line for line in lines))
 
+    def test_init_installs_into_a_nested_agent_home(self):
+        """pi's home is `~/.pi/agent`, so the skill lands a directory deeper
+        than every other agent's."""
+        self.agent_home(".pi/agent")
+        config.run_init(preset="openai-only")
+        installed = self.home / ".pi" / "agent" / "skills" / "dispatch" / "SKILL.md"
+        self.assertEqual(installed.read_text(encoding="utf-8"), config.skill_text())
+
     def test_init_skips_an_agent_home_that_is_not_installed(self):
         lines = config.run_init()
         self.assertTrue(any("not installed" in line for line in lines))

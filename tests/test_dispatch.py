@@ -29,6 +29,20 @@ from herdr_stub import (CLAUDE_TRUST_SCREEN, CLAUDE_UPDATE_SCREEN,  # noqa: E402
                         DISPATCH_ARGV, REPO_ROOT, HerdrStubTestCase, caps, cli,
                         drivers, errors, herdr, lanes, launch_argv, policy,
                         processes, prompt, records, resume_argv, runner)
+from dispatch.drivers import pi as pi_driver  # noqa: E402
+
+
+def pi_lane(case, effort="low"):
+    """A pi lane, for the length of one case.
+
+    No preset picks a pi model, because a pi install's models are its own, so
+    the lane table a pi case needs is built here rather than shipped.
+    """
+    previous = lanes.set_lane_table(
+        {**lanes.DEFAULT_LANE_TABLE,
+         "pi": lanes.LaneSpec("pi", "vendor/some-id", ("low", "high"))})
+    case.addCleanup(lanes.set_lane_table, previous)
+    return lanes.resolve_lane(f"pi@{effort}")
 
 
 # --------------------------------------------------------------------------
@@ -261,6 +275,74 @@ class TestLanes(HerdrStubTestCase):
             driver = drivers.get_driver(spec.driver)
             self.assertTrue(driver.exit_command[0], spec.driver)
             self.assertTrue(driver.agent_kind, spec.driver)
+
+    def test_pi_read_lane_pins_the_allowlist_and_the_extension(self):
+        argv = launch_argv(pi_lane(self), records.RunOptions(dir="/w"),
+                           session_id="00000000-1111-2222-3333-444444444444")
+        self.assertEqual(argv, [
+            "pi",
+            "--model", "vendor/some-id",
+            "--thinking", "low",
+            "--approve",
+            "--tools", "read,grep,find,ls,deliver",
+            "-e", pi_driver.extension_path(),
+            "--session-id", "00000000-1111-2222-3333-444444444444"])
+
+    def test_pi_write_lane_drops_the_allowlist_and_keeps_the_extension(self):
+        """The answer file is written through the extension's tool whichever
+        way the lane runs, so `-e` is not the read lane's alone."""
+        argv = launch_argv(pi_lane(self), records.RunOptions(dir="/w", write=True))
+        self.assertNotIn("--tools", argv)
+        self.assertEqual(argv[argv.index("-e") + 1], pi_driver.extension_path())
+
+    def test_pi_resume_reopens_the_session_it_was_handed(self):
+        lane = pi_lane(self)
+        opts = records.RunOptions(dir="/w")
+        session = "00000000-1111-2222-3333-444444444444"
+        self.assertEqual(resume_argv(lane, opts, session)[:3],
+                         ["pi", "--session", session])
+        with self.assertRaises(errors.DispatchError):
+            resume_argv(lane, opts, "")
+
+    def test_pi_headless_carries_the_prompt_and_no_output_file(self):
+        argv = drivers.get_driver("pi").headless_argv(
+            pi_lane(self), records.RunOptions(dir="/w"), "read /p.txt", "/o.md")
+        self.assertEqual(argv[:4], ["pi", "-p", "--mode", "text"])
+        self.assertEqual(argv[-1], "read /p.txt")
+        self.assertIn("read,grep,find,ls,deliver", argv)
+        # pi has no output-file flag: the answer arrives through the deliver
+        # tool, or through the substrate's salvage of what it printed.
+        self.assertNotIn("/o.md", argv)
+
+    def test_a_pi_lane_expands_into_every_form(self):
+        pi_lane(self)
+        self.assertEqual([label for label, _ in cli.lane_expansions("pi@low")],
+                         ["read-only", "--write", "continue", "headless"])
+
+    def test_pi_refuses_net_and_image_as_codex_only(self):
+        driver = drivers.get_driver("pi")
+        for opts in (records.RunOptions(dir="/w", net=True),
+                     records.RunOptions(dir="/w", image="shot.png")):
+            with self.assertRaises(errors.DispatchError) as caught:
+                driver.validate_options(pi_lane(self), opts)
+            self.assertIn("codex-only", str(caught.exception))
+
+    def test_the_pi_extension_is_packaged_where_the_driver_names_it(self):
+        """Every pi command line names this path, and a wheel that shipped
+        without the file would leave a read-only worker no way to answer."""
+        text = Path(pi_driver.extension_path()).read_text(encoding="utf-8")
+        self.assertIn('name: "deliver"', text)
+        self.assertIn("DISPATCH_ANSWER_FILE", text)
+
+    def test_the_answer_variable_names_the_file_the_brief_asked_for(self):
+        """What the deliver tool writes is dispatch's choice, not the worker's,
+        and a schema run's deliverable is the JSON one."""
+        rec = {"id": "r", "dir": str(self.work)}
+        env = runner.run_env(rec["id"], drivers.get_driver("pi"),
+                             runner.answer_path(rec))
+        self.assertEqual(env["DISPATCH_ANSWER_FILE"], str(self.work / "out.md"))
+        rec["schema"] = "/s.json"
+        self.assertEqual(runner.answer_path(rec), str(self.work / "out.json"))
 
     def test_option_validation_refuses_impossible_combinations(self):
         sol = lanes.resolve_lane("sol@medium")

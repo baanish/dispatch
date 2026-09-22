@@ -1,12 +1,13 @@
 """The headless substrate: a worker is a subprocess of a vendor CLI.
 
-No real codex, claude, or grok is ever launched. `fake_cli.py` is copied onto
+No real codex, claude, grok, or pi is ever launched. `fake_cli.py` is copied onto
 PATH under each driver's binary name and does what a brief tells a worker to do,
 which is write its final answer to the file the prompt names. That is what lets
 a real `dispatch run` be driven end to end here: the process, its captured
 output, and its exit code are genuine, and only the model behind them is not.
 """
 
+import json
 import os
 import sys
 import time
@@ -22,7 +23,7 @@ from herdr_stub import (HerdrStubTestCase, caps, cli, drivers,  # noqa: E402
 from dispatch.substrates import (DETECT_ORDER, detect_substrate,  # noqa: E402
                                  get_substrate, headless)
 
-FAKE_CLIS = ("codex", "claude", "grok")
+FAKE_CLIS = ("codex", "claude", "grok", "pi")
 # What tests/fake_cli.py says on stdout and on stderr.
 MESSAGE = "the fake worker is finished"
 STDERR_NOTE = "fake-cli: starting"
@@ -281,10 +282,11 @@ class TestHeadlessLiveness(HeadlessTestCase):
         worker environment and not to that list would reach every worker but a
         headless one."""
         from dispatch.substrates import headless
-        for name in ("codex", "claude", "grok"):
+        for name in ("codex", "claude", "grok", "pi"):
             driver = drivers.get_driver(name)
-            env = runner.run_env("r", driver)
+            env = runner.run_env("r", driver, "/runs/r/out.md")
             self.assertIn("CLAUDE_CODE_PROMPT_CACHE_TTL", env)
+            self.assertIn("DISPATCH_ANSWER_FILE", env)
             self.assertEqual(
                 headless.launch_environment(env, driver.metered_key_vars), env, name)
         # At the configured value only: the state file is the worker's to rewrite.
@@ -380,6 +382,34 @@ class TestHeadlessRefusals(HeadlessTestCase):
                      lambda: substrate.deliver_prompt(worker, "hello")):
             with self.assertRaises(errors.DispatchError):
                 call()
+
+
+class TestHeadlessPi(HeadlessTestCase):
+    """A pi lane end to end, and the variable its answer tool reads."""
+
+    def setUp(self):
+        super().setUp()
+        previous = lanes.set_lane_table(
+            {**lanes.DEFAULT_LANE_TABLE,
+             "pi": lanes.LaneSpec("pi", "vendor/some-id", ("low",))})
+        self.addCleanup(lanes.set_lane_table, previous)
+
+    def test_a_pi_run_completes_through_its_one_shot_form(self):
+        rec, code, _ = self.headless_run("pi@low")
+        self.assertEqual(rec["argv"][:4], ["pi", "-p", "--mode", "text"])
+        self.assertEqual(rec["argv"][-1], rec["prompt"])
+        self.assertEqual(rec["state"], "done", rec.get("error"))
+        self.assertEqual(code, cli.EXIT_OK)
+        self.assertIn(MESSAGE, records.read_output(rec))
+
+    def test_the_worker_is_told_where_its_answer_file_is(self):
+        """A pi lane without `--write` can write one file and reach it only
+        through that variable, so a run that did not set it has no answer."""
+        rec, _, _ = self.headless_run("pi@low")
+        state = json.loads(
+            (Path(rec["dir"]) / headless.STATE_FILE).read_text(encoding="utf-8"))
+        self.assertEqual(state["env"]["DISPATCH_ANSWER_FILE"],
+                         str(Path(rec["dir"]) / "out.md"))
 
 
 class TestHeadlessContinue(HeadlessTestCase):

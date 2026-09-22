@@ -603,9 +603,9 @@ Each substrate and the machines get a fake of their own, on the same principle:
 the thing dispatch talks to is simulated, and everything on this side of it is
 real.
 
-- `tests/fake_cli.py` is copied onto PATH as `codex`, `claude`, and `grok`, and
-  does what a brief tells a worker to do, which is write its final answer to the
-  file the prompt names. A headless run is driven end to end against it, with a
+- `tests/fake_cli.py` is copied onto PATH as `codex`, `claude`, `grok`, and
+  `pi`, and does what a brief tells a worker to do, which is write its final
+  answer to the file the prompt names. A headless run is driven end to end against it, with a
   real process, real captured output, and a real exit code.
 - `tests/fake_tmux.py` is a fake `tmux` binary that records every invocation and
   models one pane against a JSON state file. Its pane answers dispatch's own
