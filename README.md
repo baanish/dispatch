@@ -8,6 +8,13 @@ over ssh. It launches the worker under the tightest permissions its CLI offers
 how many can be live at once, checks in on it while it works, and records the
 brief, the answer, and the run's log under `~/.dispatch/runs/<run id>/`.
 
+It is built to be driven by an agent, not typed at by hand: the strongest
+model you have (Claude Fable or GPT Astra, at the time of writing) sits at the
+top, decomposes the work, writes the briefs, and checks the answers, and the
+workers on the cheaper lanes do the legwork. `dispatch init` installs a skill
+that tells that agent how. Every verb still works from a shell, which is how
+you watch what it is doing.
+
 Requires Python 3.11 or newer, and no third-party packages.
 
 ## Install
