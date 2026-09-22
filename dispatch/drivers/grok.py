@@ -86,7 +86,7 @@ class GrokDriver(Driver):
         if opts.write:
             raise DispatchError(
                 "grok is the opinion lane and takes no write sandbox; route "
-                "writing work to a codex or claude lane")
+                "writing work to a codex, claude, or pi lane")
         if opts.net:
             raise DispatchError("--net is codex-only")
         if opts.image:

@@ -362,4 +362,7 @@ def resolve_python():
         if probe.returncode == 0 and blob.strip().startswith("Python 3"):
             return binary
     from .errors import DispatchError
-    raise DispatchError("no working python3 found (the WindowsApps stub does not count)")
+    raise DispatchError(
+        "no working python3 on PATH, so a background run has no watcher to "
+        "start; install Python 3 and put it on PATH. The WindowsApps python.exe "
+        "does not count: it is a Store stub that runs nothing")
