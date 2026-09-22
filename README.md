@@ -41,6 +41,22 @@ dispatch doctor                         # which CLIs and machines answer here
 dispatch board                          # the five slots, and the lane filling each
 ```
 
+On a machine where everything answers, the report reads like this, one line per
+lane and one per machine:
+
+```
+dispatch 0.1.0
+config: ~/.config/dispatch/config.toml
+substrate: herdr
+
+lanes
+  ok   opus   installed at ~/.local/bin/claude, logged in
+  ok   fable  installed at ~/.local/bin/claude, logged in
+
+machines
+  none configured, every run is local
+```
+
 Every preset also picks a model for each of its lanes, and your account has to
 be entitled to those models. `dispatch doctor` answers a narrower question:
 whether each lane's CLI is on `PATH`, and for codex and claude whether its
@@ -100,12 +116,57 @@ to the shipped default lane, and to its own first lane if it does not define
 that one.
 
 A foreground run blocks until the worker finishes, then prints the answer it
-wrote. `--bg` returns instead, printing the run id on its first line and the run
+wrote, and nothing else:
+
+```
+This directory is a Python package called `dispatch`, laid out as a CLI:
+`pyproject.toml` declares the `dispatch` entry point, `dispatch/` holds
+the package, `tests/` holds the suite, and `docs/architecture.md` is the
+map of the code. `README.md` is the operator-facing documentation.
+```
+
+`--bg` returns instead, printing the run id on its first line and the run
 directory on its second, which is why both sequences keep the first line and
-drop the rest.
+drop the rest:
+
+```
+opus@medium-183640-1ed5
+~/.dispatch/runs/opus@medium-183640-1ed5
+```
 
 Every verb that takes an id takes the whole id, the first line `--bg` printed.
 There is no short form.
+
+`dispatch wait` blocks until that run ends and then prints three things: the
+run's state and the tail of its status log, the whole answer, and the end of
+what the worker's CLI printed on its own.
+
+```
+opus@medium-183640-1ed5  opus@medium  done
+
+START 2026-01-01T18:36:40Z claude --permission-mode auto --model claude-opus-5
+PROMPT 2026-01-01T18:36:44Z via paste
+ALIVE 2026-01-01T18:36:59Z worker running
+EXIT 2026-01-01T18:41:01Z rc=0
+state: done
+COMPLETE 2026-01-01T18:41:02Z state=done out=~/.dispatch/runs/opus@medium-183640-1ed5/out.md
+
+-- out.md (4 lines) --
+This directory is a Python package called `dispatch`, laid out as a CLI:
+...
+
+-- worker CLI output: last 30 lines of ~/.dispatch/runs/opus@medium-183640-1ed5/screen.log --
+> Read and follow the brief at ~/src/yourproject/brief.md. You are a
+  dispatched worker. ...
+...
+  Write(~/.dispatch/runs/opus@medium-183640-1ed5/out.md)
+Wrote the summary to out.md.
+```
+
+The run outlives the command that printed it. Its directory holds `brief.md` as
+it was passed, `prompt.txt` as dispatch typed it, the answer in `out.md`, the
+timeline in `status.log`, the screen in `screen.log`, and the record itself in
+`run.json`. [The run record](#the-run-record) is the whole list.
 
 ### The verbs
 
