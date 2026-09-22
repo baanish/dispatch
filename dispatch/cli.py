@@ -81,8 +81,8 @@ DEEP_ACTIVITY_LINES = 5
 DEEP_ACTIVITY_WIDTH = 110
 DEEP_TRANSCRIPT_BYTES = 262144
 
-# `dispatch wait`: the cadence a waiter reads status.log at, and how much it
-# prints once the run ends. A waiter is a spectator and must never cost more
+# `dispatch wait`: the cadence a waiter re-reads the run record at, and how much
+# it prints once the run ends. A waiter is a spectator and must never cost more
 # than the run it is watching.
 WAIT_POLL_SECONDS = 3.0
 WAIT_LOG_LINES = 6

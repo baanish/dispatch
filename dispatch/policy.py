@@ -61,8 +61,9 @@ class Policy:
     # or spawns one with `claude -p`: to Claude Code that is a main
     # conversation, which on a subscription defaults to the one-hour prompt
     # cache, whose writes cost 2x base input against 1.25x for the five-minute
-    # one. A worker runs its brief start to finish and is never resumed, so its
-    # turns land seconds apart, each read refreshes the entry for free, and the
+    # one. A worker's turns land minutes apart at most, whether that is the brief
+    # run to the end, a `steer` inside the same run, or a `continue` opening a
+    # new run on the session, so each read refreshes the entry for free and the
     # rest of the hour is paid for on every turn's write and never used.
     worker_env: tuple = (("CLAUDE_CODE_PROMPT_CACHE_TTL", "5m"),)
 

@@ -10,9 +10,10 @@ Two invariants shape this module:
 - A record is replaced atomically and never edited in place, because a run has
   concurrent readers by design (its watcher, a reconcile sweep, whoever ran
   `kill`).
-- Liveness is an advisory file lock held by whichever process owns a run, never
-  a bare pid. Pids get reused; a lock dies with its holder, so a crashed run
-  frees its slot and a recycled pid is never signalled by mistake.
+- A process's claim on a run is an advisory file lock, never a bare pid. Pids
+  get reused; a lock dies with its holder, so a crashed run frees its slot and a
+  recycled pid is never signalled by mistake. Whether the worker itself is still
+  alive is a different question, and `caps.run_is_live` is where it is asked.
 """
 
 from __future__ import annotations

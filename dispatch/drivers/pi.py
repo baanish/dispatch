@@ -107,8 +107,8 @@ class PiDriver(Driver):
         `--mode text` is stated rather than left to the default, because the
         other two modes print a protocol into the stream the headless substrate
         captures. There is no output-file flag, so `out_path` is accepted and
-        unused: the answer file is written by the `deliver` tool, and the
-        runner's salvage copies stdout there when a worker wrote nothing.
+        unused: the worker writes the answer file itself with the `deliver`
+        tool, and one that writes nothing fails the run.
         """
         argv = ["pi", "-p", "--mode", "text", *model_args(lane, opts)]
         if resume_session:
