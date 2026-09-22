@@ -101,6 +101,21 @@ class TestHeadlessRun(HeadlessTestCase):
         # The printed final message is still the best thing there is to show.
         self.assertIn(MESSAGE, records.read_output(rec))
 
+    def test_a_foreground_run_with_no_answer_says_so_rather_than_printing_one(self):
+        """out.md holds dispatch's copy of the last output, and printed bare it
+        reads as the deliverable. `run` labels it the way `wait` does."""
+        os.environ["FAKE_CLI_NO_DELIVERABLE"] = "1"
+        _, code, output = self.headless_run("opus@high")
+        self.assertEqual(code, cli.EXIT_FAILED)
+        self.assertIn("-- out.md: no answer --", output)
+        self.assertIn("not a deliverable", output)
+
+    def test_a_done_run_prints_its_answer_with_nothing_around_it(self):
+        """Callers parse this output, so a delivered answer keeps no label."""
+        rec, code, output = self.headless_run()
+        self.assertEqual(code, cli.EXIT_OK)
+        self.assertEqual(output, records.read_output(rec))
+
     def test_every_driver_runs_its_own_one_shot_form(self):
         for lane, head in (("sol@medium", ["codex", "exec"]),
                            ("opus@high", ["claude", "-p"]),

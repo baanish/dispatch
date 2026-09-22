@@ -268,7 +268,7 @@ def cmd_run(args):
             print(rec["id"])
             print(rec["dir"])
             return EXIT_OK
-        show(read_output(rec))
+        show_run_answer(rec)
         return run_exit_code(rec)
     else:
         remote.check_shell_options(machine, opts)
@@ -294,7 +294,7 @@ def cmd_run(args):
                           parse_deadline(opts.deadline) if opts.deadline else None)
     finally:
         release_run_lock(handle)
-    show(read_output(rec))
+    show_run_answer(rec)
     return state_exit_code(rec["state"])
 
 
@@ -422,7 +422,7 @@ def cmd_continue(args):
         print(child["id"])
         print(child["dir"])
         return EXIT_OK
-    show(read_output(child))
+    show_run_answer(child)
     return state_exit_code(child["state"])
 
 
@@ -440,7 +440,7 @@ def continue_on_machine(rec, lane, message, args):
         print(child["id"])
         print(child["dir"])
         return EXIT_OK
-    show(read_output(child))
+    show_run_answer(child)
     return run_exit_code(child)
 
 
@@ -1181,6 +1181,19 @@ def wait_answer_section(rec):
         return ["-- out.md: empty --",
                 f"the run ended {state} and {path} has nothing in it"]
     return [f"-- out.md ({len(answer)} lines) --"] + answer
+
+
+def show_run_answer(rec):
+    """What a foreground `run` or `continue` prints when its run has ended.
+
+    A `done` run prints out.md and nothing else, because a caller parses that
+    output as the answer. Anything else prints the labeled section `wait` gives,
+    so dispatch's copy of the last screen is never read as a deliverable.
+    """
+    if rec.get("state") == "done":
+        show(read_output(rec))
+        return
+    emit_frame(wait_answer_section(rec), redraw=False)
 
 
 def wait_cli_section(rec):
