@@ -367,10 +367,3 @@ class Substrate:
         """
         raise SubstrateError(
             f"the {self.name} substrate has no terminal to attach to")
-
-
-def refuse(verb, substrate):
-    """The one-line refusal a verb this substrate cannot do gives the operator."""
-    return DispatchError(
-        f"`dispatch {verb}` needs a substrate that can do it; this run lives in "
-        f"{substrate.name}, which cannot")
