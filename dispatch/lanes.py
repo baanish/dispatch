@@ -28,7 +28,7 @@ LANE_TEXT_RE = re.compile(r"^[a-z0-9]+@[a-z0-9]+(:[a-z0-9]+)?$")
 class LaneSpec:
     """One row of the lane table: a model, and the shapes it is offered in."""
 
-    driver: str               # which vendor CLI runs it: codex, claude, grok
+    driver: str               # which vendor CLI runs it: codex, claude, grok, pi
     model: str
     efforts: tuple            # the reasoning efforts this model accepts
     tier: str = ""            # the standing service tier; empty where the driver has none

@@ -1689,7 +1689,7 @@ def cmd_watch_run(args):
 def build_parser():
     parser = argparse.ArgumentParser(
         prog="dispatch",
-        description="Hand work to a codex, claude, or grok worker on a fixed lane.")
+        description="Hand work to a codex, claude, grok, or pi worker on a fixed lane.")
     parser.add_argument("--version", action="version",
                         version=f"dispatch {__version__}")
     subs = parser.add_subparsers(dest="command")
@@ -1705,7 +1705,7 @@ def build_parser():
                      help="network inside a codex write sandbox")
     run.add_argument("--add-dir", action="append",
                      help="extra writable tree (codex lanes, with --write), repeatable; "
-                          "claude: additional tool directory; grok: ignored")
+                          "claude: additional tool directory; grok and pi: ignored")
     run.add_argument("--schema", help="JSON output for this schema file; dispatch checks it parses, "
                           "not that it conforms")
     run.add_argument("--out", help="copy the final message here too")
