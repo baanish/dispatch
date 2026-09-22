@@ -320,9 +320,9 @@ Every capability is False, honestly: `steer` and `inspect` refuse with one line
 naming the substrate, `continue` still works because it relaunches through the
 driver's resume flag, and the one-shot forms are run with flags that mean the
 CLI never raises a dialog. `read_screen` returns the captured log rather than a
-screen, which is enough for the runner to measure stillness and to salvage
-`out.md`, and not enough to show an operator, which is what `can_read_screen`
-is saying.
+screen, which is enough for the runner to measure stillness and to fill `out.md`
+for a post-mortem, and not enough to show an operator, which is what
+`can_read_screen` is saying.
 
 Two details are worth knowing before reading it:
 
@@ -339,14 +339,22 @@ Two details are worth knowing before reading it:
   the captured log has grown, and on whether the deliverable is there. Nothing
   fabricates a screen that has been still.
 
-Where `out.md` comes from differs per driver, and the driver's `headless_argv`
-is where that is decided: codex is told to write the deliverable itself with
-`exec -o`; claude (`-p`), grok (`--single`), and pi (`-p`) print their final
-message on stdout, so it lands in `pane.log` and the runner's own salvage copies
-it into `out.md` when the worker wrote no file. A pi worker has a second way in:
-the `deliver` tool from the extension every pi lane loads writes `out.md`
-itself, from the path dispatch puts in `DISPATCH_ANSWER_FILE`, which is the only
-file a pi lane without `--write` can write at all.
+Where `out.md` comes from is the same here as in a pane: the worker writes it.
+The prompt names the file and asks for the answer in it, and the worker obliges
+with its CLI's own write tool, or on a pi lane with the `deliver` tool from the
+extension every pi lane loads, which writes the path dispatch puts in
+`DISPATCH_ANSWER_FILE` and is the only file a pi lane without `--write` can
+write at all. What `headless_argv` adds is a second route for codex alone:
+`exec -o` points that CLI's own final-message output at the deliverable. claude
+(`-p`), grok (`--single`), and pi (`-p`) have no such flag, so their final
+message lands in `pane.log` and nowhere else.
+
+A run whose worker wrote no `out.md` is a failed run, and `runner.finish` says
+so: `note_deliverable` records the absence before anything can obscure it, the
+state goes to `failed`, and `NO-DELIVERABLE` goes in the status log. The salvage
+that follows copies the captured output into `out.md` so the post-mortem has
+something to read. That copy is never an answer, and `deliverable_written` on
+the record is how every reader tells the two apart.
 
 ## Config, and the board
 

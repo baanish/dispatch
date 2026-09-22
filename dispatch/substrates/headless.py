@@ -15,8 +15,8 @@ It degrades honestly rather than pretending:
 - `can_read_screen`: no. `read_screen` returns what the process wrote to its
   captured output, which is a log and not a screen: nothing redraws, nothing is
   interactive, and there is no cursor an operator could be shown. The runner
-  still reads it, to measure whether the worker has gone quiet and to salvage
-  `out.md` when the worker wrote nothing.
+  still reads it, to measure whether the worker has gone quiet and to fill
+  `out.md` for the post-mortem of a worker that wrote nothing.
 - `can_answer_dialogs`: no. The one-shot forms are run with flags that mean the
   CLI never asks.
 
@@ -30,14 +30,18 @@ read, so `status` stays untracked and liveness rests on the captured log
 growing, on CPU in the worker's process tree, and on whether the deliverable
 exists.
 
-Where `out.md` comes from, per driver:
+Where `out.md` comes from is the same here as in a pane. The prompt names the
+file and asks for the answer in it, so the worker writes it with its CLI's own
+write tool, or on a pi lane with the `deliver` tool the extension registers.
+codex has a second route: `codex exec -o <path>` points the CLI's own
+final-message output at the deliverable. claude (`-p`), grok (`--single`), and
+pi (`-p`) have no such flag, so what they print lands in `pane.log` and nowhere
+else.
 
-- codex: `codex exec -o <path>` writes the final message to the deliverable
-  itself, so nothing has to be extracted from the output.
-- claude (`-p`) and grok (`--single`) print their final message on
-  stdout, which lands in `pane.log`. Every brief already asks the worker to
-  write `out.md`; when one does not, the runner's own salvage copies the
-  captured output there.
+A worker that writes no `out.md` has failed its one instruction, and
+`runner.finish` journals the run `failed` for it. The runner's salvage then
+copies the captured output into `out.md` so the post-mortem has something to
+read; `deliverable_written` on the record is what tells the two apart.
 """
 
 from __future__ import annotations

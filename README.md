@@ -67,11 +67,11 @@ machines
 
 Every preset also picks a model for each of its lanes, and your account has to
 be entitled to those models. `dispatch doctor` answers a narrower question:
-whether each lane's CLI is on `PATH`, and for codex and claude whether its
-login probe passes (grok and pi have no free probe, so an installed binary
-reads as ok). It does not
-ask a vendor which models the account behind that login may run. A lane naming a
-model you do not have is an edit to its `model` in the config, below.
+whether each lane's CLI is on `PATH`, and for codex and claude whether its login
+probe passes (grok and pi have no free probe, so an installed binary reads as
+ok). It does not ask a vendor which models the account behind that login may
+run. A lane naming a model you do not have is an edit to its `model` in the
+config, below.
 
 `dispatch doctor --smoke [LANE]` asks the wider question, and pays one small
 model call for the answer:
@@ -499,11 +499,14 @@ runtime.
 `[worker_env]` is the environment every worker starts with on top of its
 shell's. It ships with `CLAUDE_CODE_PROMPT_CACHE_TTL = "5m"`, for any `claude` a
 worker runs: Claude Code treats that as a main conversation, which on a
-subscription defaults to the one-hour prompt cache, and a worker that runs its
-brief start to finish and is never resumed pays that cache's dearer writes on
-every turn and never uses the hour. Your own variables are laid over the shipped
-ones, an empty value takes one out, and `AGENT_DEPTH`, `DISPATCH_SESSION`, and
-`DISPATCH_RUN` are dispatch's own and cannot be set here.
+subscription defaults to the one-hour prompt cache and its dearer writes. A
+worker's turns come minutes apart, whether that is the brief run to the end, a
+`steer` correcting it inside the same run, or a `continue` opening a new run on
+the same session. Five minutes is the window any of those reuse, so the hour is
+paid for on every turn and never spent. Your own variables are laid over the
+shipped ones, an empty value takes one out, and `AGENT_DEPTH`,
+`DISPATCH_SESSION`, and `DISPATCH_RUN` are dispatch's own and cannot be set
+here.
 
 Metered key blanking empties the driver's listed credential variables in the
 environment the worker is launched with. That is all it does: which account a
@@ -541,9 +544,10 @@ One run is one directory under `~/.dispatch/runs/<run id>/`:
 | `status.log` | The run's timeline: state changes, check-in verdicts, and what dispatch did when. |
 | `screen.log` | What was on the worker's screen, as far back as the substrate keeps it. |
 | `pane.log` | A headless worker's captured stdout and stderr. |
+| `worker.json` | A headless worker's launch state: the environment its home was opened with, the argv the CLI was started with, and the pid to look for. |
 | `worker.rc` | A headless worker's exit status, written by the relay that ran it. |
 | `watcher.log` | Anything a background run's detached watcher printed, which is where it says why it could not start. |
-| `owner.lock`, `watcher.lock` | Advisory locks. A run's liveness is a held lock, never a bare pid. |
+| `owner.lock`, `watcher.lock` | Advisory locks. A held one is a live dispatch process driving the run, and it dies with its holder where a pid can be reused. Whether the worker itself is alive is its substrate's answer, which headless gives from the relay's pid and `worker.rc`. |
 | `remote-run.json` | For a run placed on a machine: that machine's own record, copied down at the end. |
 
 ## Troubleshooting
