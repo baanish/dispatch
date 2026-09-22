@@ -27,6 +27,10 @@ uv tool install git+https://github.com/baanish/dispatch-oss
 install brings a `dispatch` command and nothing else: the vendor CLIs are yours
 to install and log in to.
 
+Install from that git URL and never with `pip install dispatch`: `dispatch` on
+PyPI is an unrelated package by another author, and this one is not published
+there.
+
 ## Quickstart
 
 Start from the preset that matches the CLIs you have:
