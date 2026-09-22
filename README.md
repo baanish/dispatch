@@ -20,10 +20,10 @@ Requires Python 3.11 or newer, and no third-party packages.
 ## Install
 
 ```
-uv tool install git+https://github.com/baanish/dispatch-oss
+uv tool install git+https://github.com/baanish/dispatch
 ```
 
-`pipx install git+https://github.com/baanish/dispatch-oss` works the same way. The
+`pipx install git+https://github.com/baanish/dispatch` works the same way. The
 install brings a `dispatch` command and nothing else: the vendor CLIs are yours
 to install and log in to.
 
