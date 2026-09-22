@@ -11,11 +11,13 @@ from __future__ import annotations
 import argparse
 import contextlib
 import hashlib
+import io
 import json
 import os
 import re
 import shlex
 import sys
+import tempfile
 import time
 from dataclasses import replace
 from pathlib import Path
@@ -1578,7 +1580,50 @@ def cmd_doctor(args):
                                substrate=substrate.name if substrate else "",
                                version=__version__)
     print(report, end="")
+    if args.smoke is not None:
+        ok = smoke_test(args.smoke) and ok
     return EXIT_OK if ok else EXIT_FAILED
+
+
+SMOKE_BRIEF = "Your whole answer is the single word: ok\n"
+
+
+def smoke_test(lane_text):
+    """One tiny real run on a lane, start to finish. True when it answered.
+
+    The checks above say a CLI is installed and logged in. Only a run says the
+    account behind that login may use the lane's model, and that a brief gets
+    from here to an answer in out.md on this machine. It costs a model call,
+    which is why `doctor` does not do it unasked.
+    """
+    lane_text = lane_text or default_lane()
+    print(f"\nsmoke\n  running one small task on {lane_text} (a real model call)...")
+    with tempfile.TemporaryDirectory(prefix="dispatch-smoke-") as scratch:
+        brief = Path(scratch) / "brief.md"
+        brief.write_text(SMOKE_BRIEF, encoding="utf-8")
+        work = Path(scratch) / "work"
+        work.mkdir()
+        run = build_parser().parse_args(
+            ["run", lane_text, str(brief), "--dir", str(work), "--deadline", "5m"])
+        before = {rec["id"] for rec in all_records()}
+        started, error = time.monotonic(), ""
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                cmd_run(run)
+        except DispatchError as exc:
+            error = str(exc)
+    took = int(time.monotonic() - started)
+    rec = next((r for r in all_records() if r["id"] not in before), None)
+    if rec is None:
+        print(f"  FAIL  {lane_text}  never started: {error}")
+        return False
+    if rec.get("state") == "done" and re.search(r"\bok\b", read_output(rec).lower()):
+        print(f"  ok    {lane_text}  answered in {took}s (run {rec['id']})")
+        return True
+    why = error or rec.get("error") or "no answer in out.md"
+    show(f"  FAIL  {lane_text}  {rec.get('state')}: {why}\n"
+         f"        `dispatch wait {rec['id']}` shows what the CLI printed\n")
+    return False
 
 
 def cmd_init(args):
@@ -1750,6 +1795,9 @@ def build_parser():
 
     doctor = subs.add_parser(
         "doctor", help="each lane's CLI, each machine's ssh, and the substrate")
+    doctor.add_argument("--smoke", nargs="?", const="", default=None, metavar="LANE",
+                        help="then run one tiny real task on LANE (default: "
+                             f"{default_lane()}); costs one small model call")
     doctor.set_defaults(func=cmd_doctor)
 
     init = subs.add_parser(

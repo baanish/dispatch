@@ -2944,6 +2944,32 @@ class TestRunArtifactOpens(HerdrStubTestCase):
         self.assertLessEqual(len(answer.encode("utf-8")), 8000)
 
 
+class TestDoctorSmoke(HerdrStubTestCase):
+    """`doctor --smoke`: one real run, because a green doctor proves no model."""
+
+    def test_a_lane_that_answers_is_ok_and_names_its_run(self):
+        self.stub.reply = "ok"
+        code, output = self.capture_stdout("doctor", "--smoke", "sol@medium")
+        rec = self.only_record()
+        self.assertEqual(rec["lane"], "sol@medium")
+        self.assertFalse(rec["write"])
+        self.assertIn(f"ok    sol@medium  answered in", output)
+        self.assertIn(rec["id"], output)
+
+    def test_a_lane_that_cannot_answer_fails_doctor_and_says_where_to_look(self):
+        self.stub.write_output = False
+        self.stub.self_exits = True
+        code, output = self.capture_stdout("doctor", "--smoke", "sol@medium")
+        self.assertEqual(code, cli.EXIT_FAILED)
+        rec = self.only_record()
+        self.assertIn("FAIL  sol@medium  failed", output)
+        self.assertIn(f"dispatch wait {rec['id']}", output)
+
+    def test_plain_doctor_never_starts_a_run(self):
+        self.capture_stdout("doctor")
+        self.assertEqual(records.all_records(), [])
+
+
 class TestLogTail(unittest.TestCase):
     def read_tail(self, data, count, meaningful=False):
         reads = []
