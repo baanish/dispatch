@@ -252,7 +252,7 @@ class CheckinVerdict:
 
 def checkin_verdict(signals, worker_status, deliverable_seen, prior_reviews,
                     interval_seconds=0.0, blocked_rule="", answered_rules=(),
-                    handback_rules=()):
+                    handback_rules=(), idle_after_nudge=False):
     """`working` | `blocked` | `dead` | `stuck` | `review`, for a run at its deadline.
 
     Pure, so the ladder that decides whether to end a run can be read and tested
@@ -293,6 +293,14 @@ def checkin_verdict(signals, worker_status, deliverable_seen, prior_reviews,
             return CheckinVerdict("blocked",
                                   f"still {held}; nobody is going to answer it")
         return CheckinVerdict("review", f"{held}; one more check-in before that counts")
+    if idle_after_nudge and not deliverable_seen and \
+            worker_status not in ("working", "blocked") and \
+            signals.cpu_percent < CPU_BUSY_PERCENT:
+        # Told once what it owed, it ended its turn again without it and sits
+        # at its prompt. That is a worker that has stopped, and the transcript
+        # the nudge and its reply grew is not progress.
+        return CheckinVerdict(
+            "stuck", "nudged for the deliverable and ended its turn again without it")
     if signals.screen_is_progress and \
             signals.output_idle_seconds < OUTPUT_IDLE_SECONDS:
         return CheckinVerdict(
@@ -1838,7 +1846,8 @@ class RunWrapper:
                                 prior, interval_seconds=interval_seconds,
                                 blocked_rule=rule,
                                 answered_rules=rules.answered_rules,
-                                handback_rules=rules.handback_rules)
+                                handback_rules=rules.handback_rules,
+                                idle_after_nudge=self.idle_after_nudge())
         count = checkin_count(self.rec) + 1
         self.rec["checkins"] = count
         self.rec["checkin_verdict"] = found.verdict
@@ -2234,6 +2243,12 @@ class RunWrapper:
             return True
         return int(self.rec.get("end_ready_looks") or 0) >= SETTLED_LOOKS
 
+    def idle_after_nudge(self):
+        """Was the worker nudged for its answer, and did that turn end empty too?"""
+        nudged_turn = int(self.rec.get("nudged_turn") or 0)
+        return bool(self.rec.get("nudged")) and nudged_turn > 0 and \
+            int(self.rec.get("turn_ended_logged") or 0) > nudged_turn
+
     def note_turn_without_deliverable(self):
         """A settled turn ended with nothing on disk: say so once, nudge once.
 
@@ -2255,6 +2270,7 @@ class RunWrapper:
         if self.rec.get("nudged"):
             return False
         self.rec["nudged"] = utc_now()
+        self.rec["nudged_turn"] = turns
         name = deliverable_path(self.rec).name
         append_status(self.status_path,
                       f"NUDGE {utc_now()} turn {turns} ended without {name}")

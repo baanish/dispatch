@@ -1455,6 +1455,26 @@ class TestDeadlineCheckins(HerdrStubTestCase):
             answered_rules=rules.answered_rules,
             handback_rules=rules.handback_rules).verdict
 
+    def test_a_nudged_worker_that_ended_its_turn_empty_again_is_stuck(self):
+        """A model the account cannot use answers every turn with an error and
+        sits at its prompt. The transcript that error grew read as progress,
+        and the run was extended at every check-in."""
+        signals = self.signals(at_prompt=True, transcript_idle_seconds=5.0,
+                               screen_is_progress=False)
+        going = runner.checkin_verdict(signals, "idle", False, 0,
+                                       interval_seconds=1800.0)
+        self.assertEqual(going.verdict, "working")
+        told = runner.checkin_verdict(signals, "idle", False, 0,
+                                      interval_seconds=1800.0, idle_after_nudge=True)
+        self.assertEqual(told.verdict, "stuck")
+        self.assertIn("nudged", told.reason)
+        # Not while it is still doing something about it, or has answered.
+        for status, answered in (("working", False), ("idle", True)):
+            found = runner.checkin_verdict(signals, status, answered, 0,
+                                           interval_seconds=1800.0,
+                                           idle_after_nudge=True)
+            self.assertNotEqual(found.verdict, "stuck", (status, answered))
+
     def test_a_screen_that_moved_recently_is_a_working_worker(self):
         self.assertEqual(self.verdict(output_idle_seconds=1.0), "working")
 
