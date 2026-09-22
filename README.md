@@ -533,6 +533,51 @@ One run is one directory under `~/.dispatch/runs/<run id>/`:
 | `owner.lock`, `watcher.lock` | Advisory locks. A run's liveness is a held lock, never a bare pid. |
 | `remote-run.json` | For a run placed on a machine: that machine's own record, copied down at the end. |
 
+## Troubleshooting
+
+**`dispatch: command not found` after the install succeeded.** The directory
+the tool installer writes to is not on your `PATH`. `uv tool update-shell` adds
+uv's, `pipx ensurepath` adds pipx's. Open a new shell afterwards.
+
+**A lane names a model your account cannot run.** `doctor` stays green, because
+it never asks a vendor about models. The run is what fails: it ends `failed`,
+and `dispatch wait <id>` carries the CLI's own complaint in its `worker CLI
+output` section. Put a model the account has in that lane's `model` in
+`~/.config/dispatch/config.toml`, then `dispatch doctor --smoke <lane>`.
+
+**An agent that never got the skill.** Run `dispatch skill --install`. It and
+`init` write only into agent homes that already exist (`~/.claude`, `~/.codex`,
+`~/.agents`) and print `skipped <path> (not installed)` for the rest, so an
+agent installed after your first `init` needs that command. A skill you edited
+is kept until `--force`.
+
+**`steer` or `inspect` refused, naming the headless substrate.** A headless
+worker is a subprocess with no pane to type into. `dispatch continue <id>
+<message>` starts a new turn on its session instead. Installing tmux or herdr
+puts later runs in a pane, where both verbs work; the substrate is picked when
+a run starts and does not change under a run already going.
+
+**`dispatch status` shows `NEEDS HAND`.** The worker is stopped at a dialog
+dispatch does not answer for you. The first-visit trust prompt is the only one
+it answers. Attach to the worker's terminal with `dispatch watch <id>
+--attach`, answer the dialog there, and the run carries on. `dispatch kill
+<id>` ends it instead.
+Left unanswered, the wait runs out at `[policy] human_hand_timeout`, 30 minutes
+by default.
+
+**A codex run that can write cannot reach the network.** `--write` puts codex
+in its `workspace-write` sandbox, which has no network until `--net` is passed
+too. `--net` on its own is refused, and so is `--net` on a claude or grok lane:
+dispatch configures no network sandbox on either, and does not restrict what
+those workers reach.
+
+**Claude is logged in for you but not for the worker.** The pane's session
+cannot always reach the login keychain your interactive `claude` uses, so the
+CLI comes up logged out in there. Run `claude setup-token`, then export
+`CLAUDE_CODE_OAUTH_TOKEN` in the environment you start dispatch from; workers
+inherit it. Metered-key blanking leaves that variable alone, because for a
+subscription it is the login itself.
+
 ## Contributing
 
 Issues and pull requests are welcome. The package is stdlib-only Python 3.11+,
