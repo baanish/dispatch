@@ -65,7 +65,7 @@ OWN_WORKER_ENV = ("AGENT_DEPTH", "DISPATCH_SESSION", "DISPATCH_RUN",
 
 # Where `dispatch init` installs the skill, keyed by the parent directory whose
 # presence means the tool is installed for this operator.
-SKILL_HOMES = (".claude", ".codex", ".agents")
+SKILL_HOMES = (".claude", ".codex", ".agents", ".pi/agent")
 SKILL_SUBPATH = ("skills", "dispatch")
 SKILL_FILE = "SKILL.md"
 AGENTS_SNIPPET_FILE = "agents-snippet.md"

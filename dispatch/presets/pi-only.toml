@@ -1,0 +1,60 @@
+# pi-only: every slot on pi, with the models left to you.
+#
+# Assumes `pi` is installed and logged in to at least one provider. Run
+# `dispatch doctor` to check.
+#
+# This preset is a template, not a working config: every `model` below is
+# empty, and dispatch refuses a lane without one, naming the lane it stopped
+# at. Fill each with a `provider/id` your pi can reach (`pi --list-models`
+# lists them; `--model` takes the whole string, so a lane needs no provider of
+# its own), then `dispatch doctor --smoke` to prove one real call gets through
+# on the default lane. The comment above each lane is the work that slot is
+# routed, and `efforts` are pi thinking levels.
+
+[general]
+default_lane = "medium@medium"
+
+# Bulk mechanical work at a near-free model; this is the one key a depth-1
+# worker may spawn.
+[lanes.light]
+driver = "pi"
+model = ""
+efforts = ["low", "medium"]
+
+# The default: a well-scoped task with a clear deliverable.
+[lanes.medium]
+driver = "pi"
+model = ""
+efforts = ["medium", "high"]
+
+# Work meant to be merged, or whose shape outlives the task.
+[lanes.high]
+driver = "pi"
+model = ""
+efforts = ["high", "xhigh"]
+
+# A second read, from a model that does not share the others' blind spots.
+[lanes.blindspot]
+driver = "pi"
+model = ""
+efforts = ["high", "xhigh"]
+
+# The one call worth the highest price; never a volume lane.
+[lanes.genius]
+driver = "pi"
+model = ""
+efforts = ["xhigh", "max"]
+
+[board]
+light = "light@low"
+medium = "medium@medium"
+high = "high@high"
+blindspot = "blindspot@high"
+genius = "genius@max"
+
+[board.when]
+light = "bulk mechanical work; a depth-1 worker may spawn this lane key at any effort"
+medium = "the default: a well-scoped task with a clear deliverable"
+high = "work meant to be merged, or whose shape outlives the task"
+blindspot = "a second read from a model that does not share the others' blind spots"
+genius = "the one call worth the highest price; never a volume lane"

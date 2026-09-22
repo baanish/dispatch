@@ -37,6 +37,7 @@ Start from the preset that matches the CLIs you have:
 | `openai-only` | `codex` | `astra@medium` |
 | `balanced` | `codex`, `claude`, and `grok` | `astra@medium` |
 | `all-genius` | `claude`, and one top-rate lane in every slot | `fable@high` |
+| `pi-only` | `pi`, with every lane's model left for you to fill in | `medium@medium` |
 
 Every example below uses `anthropic-only`, so every lane name and run id in
 them says `opus@medium`. Under another preset, read that preset's default lane
@@ -90,9 +91,9 @@ can actually run the lane's model, and that the whole path from brief to
 ask for it.
 
 `init` also installs the agent skill under `~/.claude/skills/dispatch/`,
-`~/.codex/skills/dispatch/`, and `~/.agents/skills/dispatch/`, for each of those
-homes that exists, and prints a short block to paste into `AGENTS.md` or
-`CLAUDE.md`. It refuses to overwrite an existing config without `--force`.
+`~/.codex/skills/dispatch/`, `~/.agents/skills/dispatch/`, and
+`~/.pi/agent/skills/dispatch/`, for each of those homes that exists, and prints
+a short block to paste into `AGENTS.md` or `CLAUDE.md`. It refuses to overwrite an existing config without `--force`.
 `dispatch skill --install` does the skill half on its own, for an agent
 installed after that first `init` or a skill left behind by an older dispatch.
 It leaves the config alone, and keeps a skill you edited until `--force`.
@@ -463,8 +464,9 @@ lanes replace the built-in set rather than merging into it. Every validation
 error names the key and the file.
 
 `dispatch init --preset <name>` writes this file from a preset: `balanced` (the
-default, one vendor per role), `openai-only`, `anthropic-only`, and `all-genius`
-(one lane in every slot).
+default, one vendor per role), `openai-only`, `anthropic-only`, `all-genius`
+(one lane in every slot), and `pi-only` (a template whose lanes name no model
+until you fill one in).
 
 Environment overrides: `DISPATCH_CONFIG` points at another user file,
 `DISPATCH_HOME` relocates `~/.dispatch`, `DISPATCH_SUBSTRATE` pins the substrate
@@ -554,7 +556,8 @@ output` section. Put a model the account has in that lane's `model` in
 
 **An agent that never got the skill.** Run `dispatch skill --install`. It and
 `init` write only into agent homes that already exist (`~/.claude`, `~/.codex`,
-`~/.agents`) and print `skipped <path> (not installed)` for the rest, so an
+`~/.agents`, `~/.pi/agent`) and print `skipped <path> (not installed)` for the
+rest, so an
 agent installed after your first `init` needs that command. A skill you edited
 is kept until `--force`.
 

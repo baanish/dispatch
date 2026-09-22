@@ -402,14 +402,20 @@ class TestBoard(ConfigTestCase):
 
 
 class TestPresets(ConfigTestCase):
+    # pi lanes name a `provider/id` that differs per pi install, so this preset
+    # ships with its models blank and is filled in before it can load.
+    TEMPLATE_PRESET = "pi-only"
+
     def test_the_shipped_presets_are_the_ones_init_offers(self):
         self.assertEqual(config.preset_names(),
                          ["all-genius", "anthropic-only", "balanced",
-                          "openai-only"])
+                          "openai-only", "pi-only"])
         self.assertIn(config.DEFAULT_PRESET, config.preset_names())
 
     def test_every_preset_loads_and_fills_the_slots_it_claims(self):
         for name in config.preset_names():
+            if name == self.TEMPLATE_PRESET:
+                continue
             with self.subTest(preset=name):
                 path = self.write_user_config(config.preset_text(name))
                 loaded = config.load_config()
@@ -433,6 +439,21 @@ class TestPresets(ConfigTestCase):
         loaded = config.load_config()
         self.assertEqual(sorted(loaded.board), sorted(board.SLOTS))
         self.assertEqual(len(set(loaded.board.values())), 1)
+
+    def test_the_template_preset_says_which_lane_needs_a_model(self):
+        """A blank model is the error a first run should get, and it names the
+        lane to fill: a placeholder that validates would read as a working
+        config until a real call failed somewhere else."""
+        text = config.preset_text(self.TEMPLATE_PRESET)
+        self.write_user_config(text)
+        with self.assertRaises(DispatchError) as caught:
+            config.load_config()
+        self.assertIn("[lanes.light] model: required", str(caught.exception))
+        self.write_user_config(text.replace('model = ""', 'model = "vendor/some-id"'))
+        loaded = config.load_config()
+        for slot, lane_text in loaded.board.items():
+            self.assertIn(lanes.resolve_lane(lane_text, loaded.lanes).key,
+                          loaded.lanes, slot)
 
     def test_an_unknown_preset_lists_the_ones_there_are(self):
         with self.assertRaises(DispatchError) as caught:
@@ -477,7 +498,8 @@ class TestPackagedSkill(ConfigTestCase):
 
 class TestInit(ConfigTestCase):
     def agent_home(self, name):
-        (self.home / name).mkdir()
+        # `parents=True` because an agent home can be nested: pi's is `.pi/agent`.
+        (self.home / name).mkdir(parents=True)
 
     def test_init_writes_the_config_and_installs_the_skill(self):
         self.agent_home(".claude")
