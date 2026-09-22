@@ -221,8 +221,8 @@ def live_records(sweep=None):
                     and rec.get("state") not in policy().terminal_states \
                     and not reserved_recently(rec):
                 # Its launcher died before the machine answered with a run to
-                # poll, so there is nothing to ask and nobody left to ask it. It
-                # used to hold its slot for good.
+                # poll, so there is nothing to ask and nobody left to ask it.
+                # Without this it holds its slot for good.
                 abandon_record(rec)
                 note_abandoned(rec, f"ORPHANED {utc_now()} the launcher is gone "
                                     "and no run was ever reported by the machine")

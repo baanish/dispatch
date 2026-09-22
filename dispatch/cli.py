@@ -190,9 +190,10 @@ def run_exit_code(rec):
 def observed_exit_code(rec):
     """The exit code of a command that looked at a run without waiting for it.
 
-    A run that is still going has not failed. Read as `state_exit_code` reads a
-    finished one, `watch` on a healthy live run exited 1, the code that means
-    the run failed, to every agent told to look closer with it.
+    A run that is still going has not failed, so it exits 0. Read the way
+    `state_exit_code` reads a finished one, `watch` on a healthy live run would
+    exit 1, the code that means the run failed, to every agent told to look
+    closer with it.
     """
     if rec.get("state") not in policy().terminal_states:
         return EXIT_OK

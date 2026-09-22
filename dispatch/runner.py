@@ -596,7 +596,7 @@ def note_deliverable(rec):
 
     The salvage puts dispatch's copy of the last screen into out.md, so the
     question cannot be asked of the file afterwards. A finalization that died
-    after the salvage and was retried used to find that copy, take it for the
+    after the salvage and was retried would find that copy, take it for the
     worker's answer, and publish the run as done. On the record, it also lets a
     reader tell an answer from a salvaged screen.
     """
@@ -2025,8 +2025,8 @@ class RunWrapper:
 
         `agent_turn_is_over` rests on the substrate having called the worker
         working at least once since it was prompted, and a substrate that tracks
-        no agents never calls it anything: on tmux, a claude or grok turn could
-        never be seen to end, so the pane and the cap slot were held until
+        no agents never calls it anything: on tmux a claude or grok turn would
+        never be seen to end, and the pane and the cap slot would be held until
         somebody killed the run by hand.
 
         So the turn is judged on the file the worker was asked to write, the way
@@ -2641,8 +2641,9 @@ def worker_belongs_to_run(rec, substrate):
     point at a stranger's live worker. The shell pid recorded at launch is the
     identity check: a recycled home has a fresh shell.
 
-    Records from before the pid was recorded answer True, which is the old
-    behaviour, not a new risk.
+    A record carrying no shell pid answers True: there is nothing to check the
+    home against, and disowning it would abandon a run that may be perfectly
+    healthy.
     """
     if not rec.get("worker_id"):
         return False
