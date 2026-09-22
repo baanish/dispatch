@@ -113,7 +113,7 @@ REMOTE_RECORD_FILE = "remote-run.json"
 # own state.
 POLLED_FIELDS = {"state": str, "rc": int, "finished": str, "error": str,
                  "session_id": str, "needs_hand": str, "checkins": int,
-                 "checkin_verdict": str, "aborted": bool,
+                 "checkin_verdict": str,
                  "started_at": (int, float), "deliverable_written": bool}
 
 

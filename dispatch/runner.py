@@ -46,7 +46,7 @@ from .records import (ABORT_MARKER, HEARTBEAT_SECONDS, RECORD_BYTE_LIMIT,
                       hold_run_lock, new_run_id, open_append, out_copy_dir,
                       out_copy_path, read_output, read_regular_bytes,
                       read_tail_bytes, release_run_lock, replace_text, run_dir,
-                      save_final_record, save_heartbeat, save_record, steer_count,
+                      save_heartbeat, save_record, steer_count,
                       utc_now,
                       validate_session_id, write_out_copy, write_status_header)
 from .substrates.base import SubstrateError, Worker, WorkerSetupError
@@ -622,8 +622,8 @@ def finalize_output(rec):
 def refresh_session_id(rec):
     """Make sure a run's native session id is on record, capturing it if needed.
 
-    `continue` and the schema repair rounds both need it, and a CLI that names
-    its own session has none until its transcript exists on disk.
+    `continue` needs it, and a CLI that names its own session has none until
+    its transcript exists on disk.
 
     Only a session this run can be shown to own is returned. One matched by the
     directory alone is recorded for the operator and handed to nobody: with
@@ -941,7 +941,7 @@ class RunWrapper:
         self.rec["rc"] = None
         self.rec["finished"] = utc_now()
         self.rec["closed_by"] = "abandon"
-        save_final_record(self.rec)
+        save_record(self.rec)
         append_status(self.status_path, "state: failed")
         with contextlib.suppress(Exception):
             self.close()
@@ -1538,26 +1538,6 @@ class RunWrapper:
         if looks < 2:
             return False
         self.prompt_worker(self.rec["prompt"])
-        return True
-
-    def reprompt(self, text):
-        """Type a follow-up into a worker that is still up, for schema repair.
-
-        False when there is nothing left to talk to, which is the normal case
-        once a worker has followed its instruction to exit the session.
-        """
-        info = self.substrate.process_info(self.worker)
-        if info is None:
-            append_status(self.status_path, f"REPROMPT {utc_now()} the home is gone")
-            return False
-        if info.at_prompt:
-            append_status(self.status_path,
-                          f"REPROMPT {utc_now()} session already exited")
-            return False
-        self.prompt_worker(text)
-        self.rec["state"] = "running"
-        self.rec["finished"] = ""
-        save_record(self.rec)
         return True
 
     # -- signals ---------------------------------------------------------
@@ -2513,7 +2493,7 @@ class RunWrapper:
         # Now, and only now: the worker has gone, so there is no detection left
         # to evict and the wall should show how this ended.
         self.report("idle", f"{self.rec['state']} rc={rc}")
-        save_final_record(self.rec)
+        save_record(self.rec)
         append_status(self.status_path, f"state: {self.rec['state']}")
         if close:
             self.close()

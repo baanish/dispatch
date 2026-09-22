@@ -2227,7 +2227,7 @@ class TestSteer(HerdrStubTestCase):
         rec["closed_by"] = "kill"
         records.save_record(rec)
         finishing = dict(rec, state="done", closed_by="herdr-wrapper")
-        records.save_final_record(finishing)
+        records.save_record(finishing)
         self.assertEqual(records.load_record(rec["id"])["state"], "killed")
 
 
@@ -2467,7 +2467,7 @@ class TestKill(HerdrStubTestCase):
         records.save_record(stale)                  # a plain write
         records.save_heartbeat(dict(stale))         # a heartbeat
         stale.update(state="done", rc=0, closed_by="runner")
-        records.save_final_record(stale)            # a finalizer
+        records.save_record(stale)            # a finalizer
 
         settled = records.load_record(rec["id"])
         self.assertEqual((settled["state"], settled["closed_by"]), ("killed", "kill"))
@@ -2480,7 +2480,7 @@ class TestKill(HerdrStubTestCase):
         rec.update(state="orphaned", finished=records.utc_now(), closed_by="reconcile")
         records.save_record(rec)
         late.update(state="done", rc=0, closed_by="runner")
-        records.save_final_record(late)
+        records.save_record(late)
         self.assertEqual(records.load_record(rec["id"])["state"], "done")
 
     def test_kill_writes_its_terminal_state_under_the_runs_lock(self):
@@ -2611,16 +2611,19 @@ class TestAbort(HerdrStubTestCase):
         """The verdict used to land after the terminal record, so a waiter could
         read `done` and exit 0 in between, and a reconciled run kept it."""
         published = []
-        real = runner.save_final_record
+        real = runner.save_record
 
         def spy(rec):
-            published.append(rec.get("state"))
+            if rec.get("finished"):
+                published.append(rec.get("state"))
             return real(rec)
 
         self.stub.reply = "still not json"
-        with patch.object(runner, "save_final_record", side_effect=spy):
+        with patch.object(runner, "save_record", side_effect=spy):
             self.run_cli("run", str(self.brief), "--schema", str(self.schema_file()))
-        self.assertEqual(published, ["failed"])
+        # Every save that carried an ending carried the failed one.
+        self.assertTrue(published)
+        self.assertEqual(set(published), {"failed"})
 
     def test_repair_rounds_are_capped(self):
         self.stub.reply = "never json"
@@ -3334,7 +3337,7 @@ class TestWait(HerdrStubTestCase):
         runs lock, and only then the COMPLETE line a waiter reads."""
         current = records.load_record(rec["id"])
         current["state"] = "done"
-        records.save_final_record(current)
+        records.save_record(current)
         records.append_status(Path(rec["dir"]) / "status.log",
                               f"COMPLETE {records.utc_now()} state=done")
 

@@ -59,7 +59,6 @@ RECORD_BYTE_LIMIT = 1 << 20
 # failure: nothing retries it.
 ABORT_MARKER = "ABORT:"
 
-COMPLETE_MARKER = "COMPLETE "
 
 
 @dataclass
@@ -395,16 +394,11 @@ def keep_the_ending_on_disk(rec, path):
                 rec.pop(field, None)
 
 
-def save_final_record(rec):
-    """Close a run. The first ending on disk stands: see `save_record`."""
-    save_record(rec)
-    return rec
-
-
 def save_heartbeat(rec):
     """Stamp a run as seen alive, without republishing the copy in memory.
 
-    Same hazard as `save_final_record`, at the other end of a run's life: a
+    The same staleness `keep_the_ending_on_disk` guards against, at the other
+    end of a run's life: a
     heartbeat is the one write that carries nothing but its own timestamp, so
     writing the whole record back would undo whatever another process journaled
     while this one was polling. Read and written under the runs lock, which is
