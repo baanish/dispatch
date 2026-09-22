@@ -1,9 +1,9 @@
 # dispatch
 
 dispatch hands one task to one AI-agent worker running on a vendor CLI you
-already have (`codex`, `claude`, `grok`), on this machine or on one you reach
-over ssh. It launches the worker under the tightest permissions its CLI offers
-(an OS sandbox on codex lanes only, see
+already have (`codex`, `claude`, `grok`, `pi`), on this machine or on one you
+reach over ssh. It launches the worker under the tightest permissions its CLI
+offers (an OS sandbox on codex lanes only, see
 [What `--write` means on each driver](#what---write-means-on-each-driver)), caps
 how many can be live at once, checks in on it while it works, and records the
 brief, the answer, and the run's log under `~/.dispatch/runs/<run id>/`.
@@ -68,8 +68,8 @@ machines
 Every preset also picks a model for each of its lanes, and your account has to
 be entitled to those models. `dispatch doctor` answers a narrower question:
 whether each lane's CLI is on `PATH`, and for codex and claude whether its
-login probe passes (grok has no free probe, so an installed binary reads as
-ok). It does not
+login probe passes (grok and pi have no free probe, so an installed binary
+reads as ok). It does not
 ask a vendor which models the account behind that login may run. A lane naming a
 model you do not have is an edit to its `model` in the config, below.
 
@@ -220,7 +220,8 @@ schema enforced, by codex itself),
 `--image PATH` (codex only), and `--on MACHINE`.
 
 On claude lanes, `--add-dir` adds a tool directory under Claude Code's permission
-rules. Grok ignores it. `continue` does not forward extra directories.
+rules. Grok and pi ignore it: neither has a sandbox a second directory could
+widen. `continue` does not forward extra directories.
 
 ### What `--write` means on each driver
 
@@ -229,11 +230,12 @@ rules. Grok ignores it. `continue` does not forward extra directories.
 | codex | Codex's OS sandbox in `read-only` mode: commands run, and a write happens only when codex's reviewing agent approves the escalation, which is how the answer file under `~/.dispatch/runs/` gets written. | The `workspace-write` sandbox: writes are confined to `--dir`, the `--add-dir` trees, and temp; no network without `--net`; escalation requests go to codex's reviewing agent. |
 | claude | Not a sandbox. `--permission-mode auto` with `Read`, `Grep`, and `Glob` pre-approved; every other tool call, shell commands and edits included, is decided by Claude Code's auto mode and your own Claude settings. | `--permission-mode auto` with nothing pre-approved. Nothing confines writes to `--dir`. |
 | grok | Not a sandbox. `--permission-mode auto`, subagents off, 12 turns. Nothing blocks a write. | Refused. |
+| pi | Not a sandbox, and the tightest read lane here: the tool allowlist `read, grep, find, ls, deliver`, so the worker runs no command and writes no file but its own answer, through the `deliver` tool dispatch's pi extension registers. | Every built-in tool, `bash`, `edit`, and `write` included. Nothing confines writes to `--dir`. |
 
 Only a codex lane is confined by the operating system, and what that confines
 is writes and network, not reads: a codex worker can read anything your account
 can, your ssh keys and other runs' answers included, and what it reads can come
-back in its answer. On claude and grok lanes, leaving `--write` off states
+back in its answer. On claude, grok, and pi lanes, leaving `--write` off states
 intent and sets permissions, and a worker that misbehaves can still cross it. A
 brief you do not trust belongs in a container or VM of your own; a codex lane
 only keeps it from writing outside `--dir`.
@@ -243,7 +245,9 @@ directory, but the CLI it starts there does: Claude Code loads that checkout's
 `.claude/settings.json`, hooks, and MCP servers, and codex its project config,
 with whatever they allow. dispatch also answers the CLI's first-visit "do you
 trust this folder" dialog for you, because you chose the directory with `--dir`,
-and the CLI remembers that answer for the directory afterwards. Look at a
+and the CLI remembers that answer for the directory afterwards. A pi lane is
+handed `--approve`, which is the same decision made on the command line: the
+project-local pi files in `--dir` are trusted for that run. Look at a
 checkout you did not write before you dispatch onto it.
 
 ### What dispatch is not
@@ -433,7 +437,7 @@ CLAUDE_CODE_PROMPT_CACHE_TTL = "5m"   # "" takes a shipped variable out
 TMPDIR = "/scratch/agents"      # your own are laid over the shipped ones
 
 [lanes.astra]                   # a [lanes] table replaces the built-in set wholesale
-driver = "codex"                # codex, claude, or grok; required
+driver = "codex"                # codex, claude, grok, or pi; required
 model = "gpt-6-astra"           # required
 efforts = ["medium", "high"]    # required, at least one
 tier = "default"                # the standing service tier; default: none
@@ -577,9 +581,9 @@ by default.
 
 **A codex run that can write cannot reach the network.** `--write` puts codex
 in its `workspace-write` sandbox, which has no network until `--net` is passed
-too. `--net` on its own is refused, and so is `--net` on a claude or grok lane:
-dispatch configures no network sandbox on either, and does not restrict what
-those workers reach.
+too. `--net` on its own is refused, and so is `--net` on a claude, grok, or pi
+lane: dispatch configures no network sandbox on any of them, and does not
+restrict what those workers reach.
 
 **Claude is logged in for you but not for the worker.** The pane's session
 cannot always reach the login keychain your interactive `claude` uses, so the

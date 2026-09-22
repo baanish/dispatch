@@ -6,8 +6,8 @@ description: Hand a bounded task to an AI-agent worker on another vendor CLI wit
 # dispatch
 
 `dispatch` runs one worker per command on the vendor CLIs installed here
-(`codex`, `claude`, `grok`), limits its permissions, caps how many can be live at once,
-and records what happened under `~/.dispatch/runs/<run id>/`. You keep
+(`codex`, `claude`, `grok`, `pi`), limits its permissions, caps how many can be
+live at once, and records what happened under `~/.dispatch/runs/<run id>/`. You keep
 decomposition, authorization, integration, and verification. A worker's result
 is evidence to check, never permission to widen the task.
 
@@ -91,8 +91,8 @@ default, which may not be the slot you meant.
 | --- | --- |
 | `--dir PATH` | The working directory, and codex's sandbox root. Defaults to the current directory. |
 | `--write` | Writing allowed, under the selected driver's own permissions. Read-only otherwise. |
-| `--net` | Network inside a codex write sandbox. Needs `--write`, and claude and grok lanes refuse it. |
-| `--add-dir PATH` | Extra writable tree on codex lanes with `--write`, repeatable. Claude adds a tool directory under its permission rules. Grok ignores it. `continue` does not forward extra directories. |
+| `--net` | Network inside a codex write sandbox. Needs `--write`, and claude, grok, and pi lanes refuse it. |
+| `--add-dir PATH` | Extra writable tree on codex lanes with `--write`, repeatable. Claude adds a tool directory under its permission rules. Grok and pi ignore it. `continue` does not forward extra directories. |
 | `--on NAME` | Place the run on a configured machine, ahead of any machine the lane names. |
 | `--bg` | Return once the worker is under way, printing the run id on the first line and the run directory on the second. |
 | `--deadline 20m` | The check-in interval. Defaults to the configured one, `30m` out of the box. |
@@ -108,9 +108,10 @@ task directory carries. A claude lane is
 Claude Code's auto permission mode, with only `Read`, `Grep`, and `Glob`
 pre-approved when `--write` is off, and a grok lane is auto permission mode
 with nothing blocking a write: on both, read-only is an instruction the brief
-must also state, not a boundary. A grok lane refuses `--write`, so route
-editing work to a codex or claude lane. An access flag authorizes nothing
-the brief did not ask for. Fix a mismatch by choosing the right lane, never by
+must also state, not a boundary. A pi lane without `--write` is the exception:
+its tool allowlist runs no command and writes nothing but the run's own answer
+file. A grok lane refuses `--write`, so route editing work to a codex, claude,
+or pi lane. An access flag authorizes nothing the brief did not ask for. Fix a mismatch by choosing the right lane, never by
 loosening a sandbox.
 
 A machine in the default `dispatch` mode runs the work through its own dispatch,

@@ -100,6 +100,14 @@ markers must appear.
 - `validate_options(lane, opts)`: the option combinations this CLI cannot
   honour. The runner runs the shared checks first.
 
+A driver may also ship a file the CLI loads. `dispatch/pi/dispatch-worker.ts`
+is the only one: `pi -e` carries it on every pi lane, and it registers the
+`deliver` tool, because a pi lane without `--write` holds no tool that could
+write the answer the brief asks for. It writes the path dispatch sets in
+`DISPATCH_ANSWER_FILE` and refuses anything else, and it lives inside the
+package for the same reason the presets do, so `importlib.resources` reaches it
+from a wheel.
+
 ### Writing a new driver
 
 Subclass `Driver`, fill the class attributes, implement the three argv builders
@@ -303,8 +311,9 @@ would mean no run ever looked finished.
 
 `headless.py` is the fallback that is always there: no daemon, no terminal, one
 subprocess per worker. It runs the driver's one-shot form (`codex exec`,
-`claude -p`, grok's non-interactive mode) with the run's environment, captures
-both output streams to `pane.log` in the run directory, and calls the run over
+`claude -p`, `pi -p`, grok's non-interactive mode) with the run's environment,
+captures both output streams to `pane.log` in the run directory, and calls the
+run over
 when that process exits.
 
 Every capability is False, honestly: `steer` and `inspect` refuse with one line
@@ -332,9 +341,12 @@ Two details are worth knowing before reading it:
 
 Where `out.md` comes from differs per driver, and the driver's `headless_argv`
 is where that is decided: codex is told to write the deliverable itself with
-`exec -o`; claude (`-p`) and grok (`--single`) print their final
+`exec -o`; claude (`-p`), grok (`--single`), and pi (`-p`) print their final
 message on stdout, so it lands in `pane.log` and the runner's own salvage copies
-it into `out.md` when the worker wrote no file.
+it into `out.md` when the worker wrote no file. A pi worker has a second way in:
+the `deliver` tool from the extension every pi lane loads writes `out.md`
+itself, from the path dispatch puts in `DISPATCH_ANSWER_FILE`, which is the only
+file a pi lane without `--write` can write at all.
 
 ## Config, and the board
 
@@ -373,8 +385,8 @@ Presets are TOML files shipped inside the package (`dispatch/presets/`), read
 through `importlib.resources` so they work from a wheel. `dispatch init` copies
 one to the user path, installs `dispatch/skill/SKILL.md` and
 `dispatch/skill/agents-snippet.md` under every agent home that exists
-(`~/.claude`, `~/.codex`, `~/.agents`), and prints the snippet for pasting into
-an AGENTS.md. The config is written once and kept until `--force`. The skill
+(`~/.claude`, `~/.codex`, `~/.agents`, `~/.pi/agent`), and prints the snippet
+for pasting into an AGENTS.md. The config is written once and kept until `--force`. The skill
 install is idempotent: an unchanged file is reported unchanged, a file that
 differs is kept until `--force`.
 
