@@ -447,20 +447,6 @@ def read_tail_bytes(path, limit):
         return ""
 
 
-def iter_json_lines(path):
-    if not Path(path).is_file():
-        return
-    with open(path, "r", encoding="utf-8", errors="replace") as fh:
-        for line in fh:
-            line = line.strip()
-            if not line or not line.startswith("{"):
-                continue
-            try:
-                yield json.loads(line)
-            except ValueError:
-                continue
-
-
 # --------------------------------------------------------------------------
 # Locking
 # --------------------------------------------------------------------------

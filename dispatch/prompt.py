@@ -20,8 +20,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .errors import DispatchError
-
 DEFAULT_PREAMBLE = (
     "You are a dispatched worker. The brief is complete: do not go looking for "
     "the instructions or documentation that sent you here, which exist for "
@@ -114,22 +112,3 @@ def nudge_prompt(path, brief):
 
 def fallback_prompt_line(path):
     return FALLBACK_PROMPT_LINE.format(path=path)
-
-
-def resolve_brief(brief, must_exist=True):
-    """Read a brief file. A `Path`, or text with a newline, is never a path.
-
-    The ambiguity is deliberate at the API boundary: a caller may pass inline
-    text, and a single-line string naming an existing file is read as that file.
-    """
-    try:
-        is_path = isinstance(brief, Path) or (
-            isinstance(brief, str) and "\n" not in brief and len(brief) < 4096
-            and Path(brief).is_file())
-    except (OSError, ValueError):  # NUL bytes and over-long names are inline text
-        is_path = False
-    if is_path:
-        return Path(brief).read_text(encoding="utf-8")
-    if must_exist:
-        raise DispatchError(f"brief file not found: {brief}")
-    return str(brief)
