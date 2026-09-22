@@ -2884,6 +2884,34 @@ class TestProcessIdentifiers(unittest.TestCase):
                     self.assertEqual(processes.descendant_pids([value]), [])
 
 
+class TestRunLocks(HerdrStubTestCase):
+    """`hold_run_lock` reaches for a run's lock rather than grabbing at it once."""
+
+    def test_a_hold_that_clears_is_waited_out_rather_than_refused(self):
+        """Two commands touching one run in the same instant are ordinary usage.
+        A single attempt made them refuse each other, and `dispatch watch` said
+        "already has a watcher" about a lock free milliseconds later."""
+        rec = self.make_live_record()
+        blocker = records.hold_run_lock(rec, "watcher.lock")
+        self.assertIsNotNone(blocker)
+        threading.Timer(0.1, records.release_run_lock, (blocker,)).start()
+        handle = records.hold_run_lock(rec, "watcher.lock")
+        self.addCleanup(records.release_run_lock, handle)
+        self.assertIsNotNone(handle, "a lock free within the window was refused")
+
+    def test_a_lock_held_throughout_the_window_is_still_refused(self):
+        """Non-blocking is the point: a live owner gets named, never queued
+        behind, so the reach gives up and the caller says whose it is."""
+        rec = self.make_live_record()
+        blocker = records.hold_run_lock(rec, "watcher.lock")
+        self.addCleanup(records.release_run_lock, blocker)
+        with patch.object(records, "RUN_LOCK_WAIT_SECONDS", 0.1):
+            started = time.monotonic()
+            self.assertIsNone(records.hold_run_lock(rec, "watcher.lock"))
+        self.assertLess(time.monotonic() - started, 5,
+                        "the reach blocked instead of giving up")
+
+
 class TestRecordLocation(HerdrStubTestCase):
     """A worker can write its own run.json, `id` and `dir` included."""
 

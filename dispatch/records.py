@@ -574,11 +574,31 @@ def lock_is_held(path):
 HELD_LOCKS = []
 
 
+# How long a run lock is reached for before the answer is "somebody has it".
+# A command that takes one holds it for as long as it drives that run, so a
+# refusal is meant to name a live owner. Two commands arriving in the same
+# instant are not that: whichever loses the race would refuse over a hold it
+# could have waited out, which is why the reach is not a single attempt.
+RUN_LOCK_WAIT_SECONDS = 1.0
+RUN_LOCK_POLL_SECONDS = 0.02
+
+
 def hold_run_lock(rec, name):
-    handle = lock_handle(Path(rec["dir"]) / name, blocking=False)
-    if handle is not None:
-        HELD_LOCKS.append(handle)
-    return handle
+    """Take one of a run's locks for the life of this process, or None.
+
+    Never blocks on a lock a live command holds: after RUN_LOCK_WAIT_SECONDS the
+    caller gets None and says so in its own words.
+    """
+    path = Path(rec["dir"]) / name
+    deadline = time.monotonic() + RUN_LOCK_WAIT_SECONDS
+    while True:
+        handle = lock_handle(path, blocking=False)
+        if handle is not None:
+            HELD_LOCKS.append(handle)
+            return handle
+        if time.monotonic() >= deadline:
+            return None
+        time.sleep(RUN_LOCK_POLL_SECONDS)
 
 
 def release_run_lock(handle):
