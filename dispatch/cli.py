@@ -1333,11 +1333,11 @@ def cmd_inspect(args):
     opts = RunOptions(dir=rec.get("cwd") or os.getcwd(), write=bool(rec.get("write")),
                       net=bool(rec.get("net")))
     argv = driver.resume_argv(lane, opts, session_id)
-    from .runner import run_env
+    from .runner import answer_path, run_env
     from dataclasses import replace as _replace
     worker = _replace(
         substrate.open(label=f"inspect-{rec['id']}", cwd=rec.get("cwd") or "",
-                       env=run_env(rec["id"], driver), focus=True),
+                       env=run_env(rec["id"], driver, answer_path(rec)), focus=True),
         agent=run_agent_name(rec, substrate))
     log_path = Path(rec["dir"]) / "status.log"
     try:

@@ -357,11 +357,15 @@ def checkin_reviews(rec):
 # --------------------------------------------------------------------------
 
 
-def run_env(run_id, driver):
+def run_env(run_id, driver, answer=""):
     """What the worker's environment must carry before the CLI starts.
 
     The ladder marker has to be the child's rung, not ours; the session key
     keeps every run a worker spawns counted against this session's allowance.
+    `answer` is the file the run's deliverable belongs in, for a CLI whose
+    worker is handed a tool to write it rather than a path to type: pi's
+    `deliver` reads it, and a run whose path is not settled yet omits it, since
+    an empty value names a file at the filesystem root.
 
     Metered keys are blanked when policy says to. A worker's shell may inherit a
     daemon's environment rather than this process's, so checking our own
@@ -375,6 +379,8 @@ def run_env(run_id, driver):
     env.update({DEPTH_ENV: str(child_depth()),
                 "DISPATCH_SESSION": session_key(),
                 "DISPATCH_RUN": str(run_id)})
+    if answer:
+        env["DISPATCH_ANSWER_FILE"] = str(answer)
     for var in blanked_keys(driver):
         env[var] = ""
     return env
@@ -415,6 +421,11 @@ def worker_path(rec, name):
     if staging:
         return posixpath.join(staging, name)
     return str(Path(rec["dir"]) / name)
+
+
+def answer_path(rec):
+    """The file this run's answer belongs in, as the worker sees it."""
+    return worker_path(rec, "out.json" if rec.get("schema") else "out.md")
 
 
 def prepare_run(lane, brief_text, opts, substrate, kind="run", parent="",
@@ -772,7 +783,7 @@ class RunWrapper:
         refusals that must stand are not birth failures and propagate on the
         first home that reports them.
         """
-        env = run_env(self.rec["id"], self.driver)
+        env = run_env(self.rec["id"], self.driver, answer_path(self.rec))
         for attempt in range(1, WORKER_SETUP_ATTEMPTS + 1):
             self.worker = replace(
                 self.substrate.open(label=self.rec["id"],
@@ -821,7 +832,8 @@ class RunWrapper:
         keys = blanked_keys(self.driver)
         assignments = [(DEPTH_ENV, str(child_depth())),
                        ("DISPATCH_SESSION", session_key()),
-                       ("DISPATCH_RUN", str(self.rec["id"]))]
+                       ("DISPATCH_RUN", str(self.rec["id"])),
+                       ("DISPATCH_ANSWER_FILE", answer_path(self.rec))]
         assignments += [(var, "") for var in keys]
         return self.substrate.verify_environment(
             self.worker, assignments, DEPTH_ENV, child_depth(), keys,
@@ -1681,7 +1693,8 @@ class RunWrapper:
         self.substrate.wait_for_shell(self.worker)
         self.verify_environment()
         self.substrate.restore_launch_state(
-            self.worker, self.rec.get("cwd") or "", run_env(self.rec["id"], self.driver))
+            self.worker, self.rec.get("cwd") or "",
+            run_env(self.rec["id"], self.driver, answer_path(self.rec)))
         self.start_worker(self.rec["argv"])
         # `wait_for_hand=False` because this is inside the poll loop: a respawn
         # that walks into a dialog only a human can clear leaves the brief owed

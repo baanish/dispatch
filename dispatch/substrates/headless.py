@@ -88,7 +88,8 @@ RC_RELAY = ("import os,subprocess,sys; rc=subprocess.call(sys.argv[2:]); "
 # The variables dispatch itself hands a worker. Anything else found in the saved
 # state is not dispatch's, and the state file sits in a directory the worker may
 # be able to write.
-LAUNCH_ENV_NAMES = ("AGENT_DEPTH", "DISPATCH_SESSION", "DISPATCH_RUN")
+LAUNCH_ENV_NAMES = ("AGENT_DEPTH", "DISPATCH_SESSION", "DISPATCH_RUN",
+                    "DISPATCH_ANSWER_FILE")
 
 
 def launch_environment(saved, blanked=()):

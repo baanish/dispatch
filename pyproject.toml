@@ -35,4 +35,4 @@ dispatch = "dispatch.cli:main"
 include = ["dispatch*"]
 
 [tool.setuptools.package-data]
-dispatch = ["presets/*.toml", "skill/*.md"]
+dispatch = ["presets/*.toml", "skill/*.md", "pi/*.ts"]

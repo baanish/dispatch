@@ -60,7 +60,8 @@ SECTIONS = ("general", "caps", "policy", "worker_env", "lanes", "machines", "boa
 
 # The markers dispatch sets in a worker's environment itself. `[worker_env]` may
 # not name them: the depth marker decided by a config file is no ladder.
-OWN_WORKER_ENV = ("AGENT_DEPTH", "DISPATCH_SESSION", "DISPATCH_RUN")
+OWN_WORKER_ENV = ("AGENT_DEPTH", "DISPATCH_SESSION", "DISPATCH_RUN",
+                  "DISPATCH_ANSWER_FILE")
 
 # Where `dispatch init` installs the skill, keyed by the parent directory whose
 # presence means the tool is installed for this operator.
