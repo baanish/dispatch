@@ -58,16 +58,37 @@ installed after that first `init` or a skill left behind by an older dispatch.
 It leaves the config alone, and keeps a skill you edited until `--force`.
 
 Then write a brief and run it. There are no inline prompts: a brief is a file,
-and its path is what `dispatch run` takes.
+and its path is what `dispatch run` takes. In bash:
 
-```
+```bash
 cat > brief.md <<'EOF'
 List the top-level files in this directory and say what this project appears
 to be, in a short paragraph. Read only: change no file and run no command that
 writes.
 EOF
 
+dispatch run brief.md --dir .                           # block, print the answer
+
+run_id=$(dispatch run brief.md --dir . --bg | head -1)  # return, keep the id
+dispatch status                                         # one line per run
+dispatch wait "$run_id"                                 # block, then print the answer
+```
+
+The same sequence in PowerShell:
+
+```powershell
+@'
+List the top-level files in this directory and say what this project appears
+to be, in a short paragraph. Read only: change no file and run no command that
+writes.
+'@ | Set-Content brief.md
+
 dispatch run brief.md --dir .
+
+$lines = dispatch run brief.md --dir . --bg
+$runId = $lines | Select-Object -First 1
+dispatch status
+dispatch wait $runId
 ```
 
 That brief only reads, so the run needs no `--write`; a task that has to change
@@ -80,16 +101,8 @@ that one.
 
 A foreground run blocks until the worker finishes, then prints the answer it
 wrote. `--bg` returns instead, printing the run id on its first line and the run
-directory on its second:
-
-```
-run_id=$(dispatch run brief.md --dir . --bg | head -1)
-# run_id is now opus@medium-183640-1ed5, and the second line `head` dropped
-# was ~/.dispatch/runs/opus@medium-183640-1ed5
-
-dispatch status          # one line per run
-dispatch wait "$run_id"  # block, then print the answer
-```
+directory on its second, which is why both sequences keep the first line and
+drop the rest.
 
 Every verb that takes an id takes the whole id, the first line `--bg` printed.
 There is no short form.
