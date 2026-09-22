@@ -1140,12 +1140,12 @@ def parse_give_up(text):
         raise DispatchError(f"bad --give-up: {text!r} (use 45s, 30m, 2h)")
 
 
-def run_has_ended(rec, status_path):
+def run_has_ended(rec):
     """A terminal record, and nothing else.
 
     The COMPLETE line in status.log is a journal entry for a reader, not the
-    ending: a worker can write in that log, and a line it wrote there used to
-    stop a waiter while the run was still going.
+    ending: a worker can write in that log, so a line it forged there would stop
+    a waiter while the run was still going.
     """
     return rec.get("state") in policy().terminal_states
 
@@ -1221,7 +1221,7 @@ def wait_cli_section(rec):
 def cmd_wait(args):
     """Block until a run ends, then print what ended it.
 
-    It polls the run's own status.log and, while somebody is watching the run,
+    It polls the run's own record and, while somebody is watching the run,
     takes no lock and reports nothing, so any number of waiters on one run stay
     harmless and none of them is an authority over it.
 
@@ -1251,16 +1251,9 @@ def cmd_wait(args):
         # A remote run whose files have not come down yet has not ended for a
         # waiter: reporting it now is `done` with no answer to print. It gets a
         # few more polls, not forever, since a missing file never arrives.
-        if run_has_ended(rec, status_path) and rec.get("mirror_pending") \
-                and copies_left > 0:
+        if run_has_ended(rec) and rec.get("mirror_pending") and copies_left > 0:
             copies_left -= 1
-        elif run_has_ended(rec, status_path):
-            # The wrapper saves the state and then writes COMPLETE, so a record
-            # read before that line landed is a record read one write too early.
-            # Reading it again is what keeps a finished run from being reported
-            # with the state it held while it was still working.
-            if rec.get("state") not in policy().terminal_states:
-                rec = load_record(rec["id"])
+        elif run_has_ended(rec):
             break
         left = None if give_up is None else give_up - (time.time() - started)
         if left is not None and left <= 0:
@@ -1273,8 +1266,7 @@ def cmd_wait(args):
         if rec.get("worker_id") and substrate is not None and not run_is_watched(rec):
             with contextlib.suppress(SubstrateError, OSError):
                 rec = reconcile_run(rec, substrate)
-            if rec.get("state") in policy().terminal_states \
-                    and run_has_ended(rec, status_path):
+            if run_has_ended(rec):
                 break
         pace = REMOTE_FOLLOW_SECONDS if remote.is_remote(rec) else WAIT_POLL_SECONDS
         time.sleep(pace if left is None else min(pace, left))
@@ -1544,7 +1536,7 @@ def close_inspect_worker(rec, substrate):
 
 
 def lane_expansions(lane_text):
-    """(label, argv) pairs a human can diff against what the lane actually types."""
+    """(label, argv) pairs a human can diff against what the lane launches."""
     lane = resolve_lane(lane_text)
     driver = driver_for_lane(lane)
     session = "00000000-1111-2222-3333-444444444444"
@@ -1565,8 +1557,9 @@ def cmd_lanes(args):
     substrate = optional_substrate()
     print(f"dispatch {__version__}  runs: {runs_root()}  depth: {current_depth()}  "
           f"substrate: {substrate.name if substrate else 'none reachable'}")
-    print("A worker is an interactive CLI in its substrate's own home; the brief "
-          "goes in after the TUI is up, never as an argv element.")
+    print("A worker is a vendor CLI in its substrate's own home. In a pane the "
+          "prompt is typed in after the TUI is up; headless has no TUI, so the "
+          "one-shot form carries it as an argv element.")
     for name in lane_names():
         lane = resolve_lane(name)
         driver = driver_for_lane(lane)
