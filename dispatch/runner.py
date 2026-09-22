@@ -46,7 +46,7 @@ from .records import (ABORT_MARKER, HEARTBEAT_SECONDS, RECORD_BYTE_LIMIT,
                       hold_run_lock, new_run_id, open_append, out_copy_dir,
                       out_copy_path, read_output, read_regular_bytes,
                       read_tail_bytes, release_run_lock, replace_text, run_dir,
-                      save_heartbeat, save_record, steer_count,
+                      save_heartbeat, save_record, stamp_epoch, steer_count,
                       utc_now,
                       validate_session_id, write_out_copy, write_status_header)
 from .substrates.base import SubstrateError, Worker, WorkerSetupError
@@ -757,7 +757,10 @@ class RunWrapper:
         self._trust_answered_at = 0.0
         # Enters put into a handed-back trust dialog this run, capped.
         self._trust_attempts = 0
-        self._prompted_at = 0.0
+        # From the record, not zero: a wrapper that adopts a run never prompted
+        # it, and with nothing here every file on disk read as written after
+        # the prompt, which is the one thing `deliverable_after_prompt` asks.
+        self._prompted_at = float(stamp_epoch(rec.get("prompted")) or 0.0)
         self._steers_seen = steer_count(rec)
         self._worked_since_prompt = False
         self._settled_since = None

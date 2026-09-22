@@ -2537,6 +2537,22 @@ class TestKill(HerdrStubTestCase):
             self.run_cli("steer", rec["id"], "use the other table")
         self.assertEqual(seen, [1])
 
+    def test_an_adopting_wrapper_knows_when_the_brief_went_in(self):
+        """It never prompted the worker itself, so without the record's stamp
+        every file on disk read as written after the prompt, and an untracked
+        worker adopted mid-turn could be ended on an answer from before it."""
+        rec = self.make_live_record()
+        rec["prompted"] = records.utc_now()
+        records.save_record(rec)
+        out = Path(rec["dir"]) / "out.md"
+        out.write_text("from before", encoding="utf-8")
+        old = time.time() - 600
+        os.utime(out, (old, old))
+        adopted = runner.RunWrapper(herdr.HerdrSubstrate(), records.load_record(rec["id"]))
+        self.assertFalse(adopted.deliverable_after_prompt())
+        os.utime(out, None)
+        self.assertTrue(adopted.deliverable_after_prompt())
+
     def test_a_stale_writer_cannot_change_how_a_run_ended(self):
         """A watcher mid-poll still holds `running` after `kill` wrote `killed`,
         and a late finalizer still holds its own verdict after `done` landed."""
