@@ -65,6 +65,23 @@ ok). It does not
 ask a vendor which models the account behind that login may run. A lane naming a
 model you do not have is an edit to its `model` in the config, below.
 
+`dispatch doctor --smoke [LANE]` asks the wider question, and pays one small
+model call for the answer:
+
+```
+dispatch doctor --smoke              # the default lane
+dispatch doctor --smoke fable@high   # or whichever lane you name
+```
+
+It runs the checks above and then one tiny real task on that lane: read-only,
+in an empty temporary directory, in the foreground. It reports `ok` with how
+long the task took and the run id, or `FAIL` with the run's state, its error,
+and the `dispatch wait <id>` that shows the CLI's own output. A failure exits
+1. What it proves that `doctor` alone cannot: that the account behind the login
+can actually run the lane's model, and that the whole path from brief to
+`out.md` works on this machine. It costs that call, which is why you have to
+ask for it.
+
 `init` also installs the agent skill under `~/.claude/skills/dispatch/`,
 `~/.codex/skills/dispatch/`, and `~/.agents/skills/dispatch/`, for each of those
 homes that exists, and prints a short block to paste into `AGENTS.md` or
