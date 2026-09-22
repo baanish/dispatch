@@ -24,12 +24,16 @@ to install and log in to.
 
 Start from the preset that matches the CLIs you have:
 
-| Preset | What it assumes |
-| --- | --- |
-| `anthropic-only` | `claude` |
-| `openai-only` | `codex` |
-| `balanced` | `codex`, `claude`, and `grok` |
-| `all-genius` | `claude`, and one top-rate lane in every slot |
+| Preset | What it assumes | Default lane |
+| --- | --- | --- |
+| `anthropic-only` | `claude` | `opus@medium` |
+| `openai-only` | `codex` | `astra@medium` |
+| `balanced` | `codex`, `claude`, and `grok` | `astra@medium` |
+| `all-genius` | `claude`, and one top-rate lane in every slot | `fable@high` |
+
+Every example below uses `anthropic-only`, so every lane name and run id in
+them says `opus@medium`. Under another preset, read that preset's default lane
+in its place.
 
 ```
 dispatch init --preset anthropic-only   # writes ~/.config/dispatch/config.toml
@@ -80,8 +84,8 @@ directory on its second:
 
 ```
 run_id=$(dispatch run brief.md --dir . --bg | head -1)
-# run_id is now astra@medium-183640-1ed5, and the second line `head` dropped
-# was ~/.dispatch/runs/astra@medium-183640-1ed5
+# run_id is now opus@medium-183640-1ed5, and the second line `head` dropped
+# was ~/.dispatch/runs/opus@medium-183640-1ed5
 
 dispatch status          # one line per run
 dispatch wait "$run_id"  # block, then print the answer
