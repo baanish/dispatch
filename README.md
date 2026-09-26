@@ -57,7 +57,7 @@ On a machine where everything answers, the report reads like this, one line per
 lane and one per machine:
 
 ```
-dispatch 0.1.0
+dispatch 0.2.0
 config: ~/.config/dispatch/config.toml
 substrate: herdr
 
