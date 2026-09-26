@@ -1009,9 +1009,14 @@ class RunWrapper:
                 time.sleep(min(0.25, READY_IDLE_SECONDS / 2))
                 continue
             trust_on_screen = self.screen_has_trust_prompt()
-            if found.status == "blocked" or trust_on_screen:
+            # A trust dialog the substrate reports as idle is answered, never
+            # typed into: text at a single-key dialog is a string of answers.
+            idle_trust = found.status in READY_STATES and \
+                screen_is_trust_dialog(self.screen(), self.driver)
+            if found.status == "blocked" or trust_on_screen or idle_trust:
                 idle_since = None
                 answered = (self.answer_trust_prompt() if trust_on_screen
+                            else self.answer_trust_screen() if idle_trust
                             else self.answer_blocking_dialog())
                 if not answered:
                     # Not ours to answer, or already answered and not yet
@@ -1116,7 +1121,8 @@ class RunWrapper:
 
         A CLI whose trust dialog is recognised by its own words rather than by a
         detection rule has no path to `handle_handback_form` on a substrate that
-        tracks no agent: there is no `blocked` status to route through. Without
+        tracks no agent, or one that reports the dialog as idle: there is no
+        `blocked` status to route through. Without
         this the dialog is just a screen that has stopped changing, and the next
         thing typed into it is the brief, at a numbered selector.
 
@@ -1125,6 +1131,9 @@ class RunWrapper:
         wrong. Always False, so readiness is measured again on the redraw.
         """
         rules = self.driver.dialog_rules
+        if self._trust_answered_at and \
+                time.time() - self._trust_answered_at < TRUST_RECHECK_SECONDS:
+            return False
         if self._trust_attempts >= rules.trust_attempts:
             self.note_needs_hand(UNNAMED_TRUST_RULE)
             return False
@@ -1139,8 +1148,8 @@ class RunWrapper:
         save_record(self.rec)
         append_status(self.status_path,
                       f"TRUST-APPROVED {utc_now()} answered the trust dialog on "
-                      f"screen with {'+'.join(keys)}: nothing here "
-                      "tracks the agent, so the screen is the whole evidence")
+                      f"screen with {'+'.join(keys)}: no rule names it, so "
+                      "the screen is the whole evidence")
         self._ready_screen = None
         return False
 
@@ -1380,6 +1389,7 @@ class RunWrapper:
                 save_record(self.rec)
                 return method
             until = time.monotonic() + PROMPT_ACCEPT_SECONDS
+            nudged = False
             while True:
                 found = None if method == "delivered" else self.substrate.status(self.worker)
                 # Herdr can report Codex's animated idle composer as working.
@@ -1402,7 +1412,17 @@ class RunWrapper:
                         f"{self.rec['id']}: prompt was never accepted; "
                         "the worker is blocked on a dialog")
                 if time.monotonic() >= until:
-                    break
+                    if nudged:
+                        break
+                    # Codex 0.157 has left a brief unsubmitted in the composer,
+                    # most likely a fast write read as a paste burst whose enter
+                    # became a newline. A lone enter submits it; writing the
+                    # brief again would only stack a second copy beside it.
+                    self.substrate.send_keys(self.worker, ["enter"])
+                    append_status(self.status_path,
+                                  f"PROMPT-ENTER {utc_now()} attempt {attempt}")
+                    nudged = True
+                    until = time.monotonic() + PROMPT_ACCEPT_SECONDS
                 time.sleep(POLL_SECONDS)
             if attempt < PROMPT_MAX_ATTEMPTS:
                 append_status(self.status_path,

@@ -101,6 +101,13 @@ grok v1.0.6 installed successfully!
   Please restart Grok.
 """
 
+GROK_TRUST_SCREEN = """\
+ Do you trust the contents of this directory?
+ /private/tmp/dispatch-trust-probe-e5f6
+ > Yes, proceed  y
+   No, quit  n
+"""
+
 CLAUDE_UPDATE_SCREEN = "\n\u2713 Update installed \u00b7 Restart to apply\n"
 
 
@@ -807,8 +814,9 @@ class StubHerdr:
             reference = text.split()[-1].strip("'\"")
             with contextlib.suppress(OSError):
                 self.deliver_prompt(pane, Path(reference).read_text(encoding="utf-8"))
-        elif pane.running or text.startswith("Read and follow the brief") \
+        elif (pane.running and text) or text.startswith("Read and follow the brief") \
                 or "Course correction" in text or "does not satisfy the contract" in text:
+            # Not a bare enter: at an empty composer that submits nothing.
             self.deliver_prompt(pane, text)          # the typed-in fallback prompt
         elif text:
             pane.pending_polls = self.child_delay_polls

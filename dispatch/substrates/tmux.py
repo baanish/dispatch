@@ -97,6 +97,8 @@ KEY_NAMES = {
     "enter": "Enter", "escape": "Escape", "tab": "Tab", "space": "Space",
     "backspace": "BSpace", "up": "Up", "down": "Down", "left": "Left",
     "right": "Right",
+    # grok's trust dialog takes a single-key answer.
+    "y": "y",
 }
 
 # What tmux says on every command once the last session is gone, which is the

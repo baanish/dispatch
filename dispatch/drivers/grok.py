@@ -13,7 +13,7 @@ from pathlib import Path
 
 from ..errors import DispatchError
 from ..records import SESSION_ID_RE, validate_session_id
-from .base import Driver, register_driver
+from .base import DialogRules, Driver, register_driver
 
 # The turn cap on an opinion run: an outside view is bounded work by definition.
 MAX_TURNS = "12"
@@ -30,6 +30,14 @@ class GrokDriver(Driver):
     # manager prints that too, and a match relaunches the run.
     update_markers = ("updating grok", "please restart grok")
     metered_key_vars = ("XAI_API_KEY", "GROK_API_KEY")
+    # grok 1.0.41 asks on the first visit to a directory holding project
+    # instructions or repo-local config, with single-key answers
+    # ("Yes, proceed  y" / "No, quit  n"), and herdr reports that screen as idle.
+    # Typed into, the brief's first "n" answers it and grok exits 0.
+    dialog_rules = DialogRules(
+        trust_markers=("do you trust the contents of this directory", "no, quit"),
+        trust_keys=("y",),
+        trust_attempts=2)
     cli_binary = "grok"
     # Deliberately none, for the same reason as claude: the CLI exposes no
     # non-interactive auth check that does not start a session.

@@ -25,7 +25,8 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from herdr_stub import (CLAUDE_TRUST_SCREEN, CLAUDE_UPDATE_SCREEN,  # noqa: E402
-                        CODEX_UPDATE_SCREEN, GROK_UPDATE_SCREEN, METERED_VARS,
+                        CODEX_UPDATE_SCREEN, GROK_TRUST_SCREEN, GROK_UPDATE_SCREEN,
+                        METERED_VARS,
                         DISPATCH_ARGV, REPO_ROOT, HerdrStubTestCase, caps, cli,
                         drivers, errors, herdr, lanes, launch_argv, policy,
                         processes, prompt, records, resume_argv, runner)
@@ -578,6 +579,34 @@ class TestPaneSpawn(HerdrStubTestCase):
         self.assertEqual(code, cli.EXIT_OK)
         self.assertEqual(len(self.stub.prompts), 2)
         self.assertEqual(self.only_record()["turns"], 1)
+
+    def test_an_unsubmitted_codex_brief_gets_one_enter_before_a_resend(self):
+        """codex can read a fast write as a paste and keep its enter as a
+        newline, leaving the brief in the composer. An enter submits it; writing
+        the brief again would stack a second copy beside it."""
+        rec = self.make_live_record()
+        pane = self.stub.panes[rec["worker_id"]]
+        pane.agent_name = rec["agent"]
+        pane.running = True
+        pane.status = "idle"
+        self.stub.swallow_prompts = 1
+        wrapper = runner.RunWrapper(self.substrate(), rec)
+        wrapper.attach()
+        send_keys = wrapper.substrate.send_keys
+
+        def submit(worker, keys):
+            if list(keys) == ["enter"]:
+                Path(runner.deliverable_path(rec)).write_text("answer")
+            return send_keys(worker, keys)
+
+        with patch.object(runner, "PROMPT_ACCEPT_SECONDS", 0.03), \
+                patch.object(wrapper.substrate, "send_keys", side_effect=submit):
+            wrapper.prompt_worker("follow up")
+        self.assertEqual(len(self.stub.prompts), 1)
+        self.assertTrue(rec["prompted"])
+        log = (Path(rec["dir"]) / "status.log").read_text()
+        self.assertLess(log.index("PROMPT-ENTER"), log.index("PROMPT-ACCEPTED"))
+        self.assertNotIn("PROMPT-RETRY", log)
 
     def test_a_fast_codex_turn_is_not_repeated_after_a_prompt_timeout(self):
         self.stub.errors["agent.prompt"] = {"code": "timeout", "message": "timed out"}
@@ -4015,6 +4044,36 @@ class TestTrustDialog(HerdrStubTestCase):
         self.assertEqual(self.stub.typed(), ["1", "1"])
         self.assertEqual(rec["needs_hand"], runner.UNNAMED_TRUST_RULE)
         self.assertEqual(self.stub.prompts, [])
+
+    def test_grok_trust_dialog_is_recognised_and_answered_with_y(self):
+        grok = drivers.get_driver("grok")
+        self.assertTrue(runner.screen_is_trust_dialog(GROK_TRUST_SCREEN, grok))
+        self.assertEqual(runner.trust_dialog_keys(GROK_TRUST_SCREEN,
+                                                  grok.dialog_rules), ("y",))
+
+    def test_a_trust_dialog_herdr_reports_idle_is_answered_not_typed_into(self):
+        """grok's dialog takes single keys, so a brief typed into it is a string
+        of answers, and its first "n" quits grok."""
+        rec = self.make_live_record(lane="grok@high")
+        pane = self.stub.panes[rec["worker_id"]]
+        pane.agent_name = rec["agent"]
+        pane.running = True
+        pane.status = "idle"
+        wrapper = runner.RunWrapper(self.substrate(), rec)
+        wrapper.attach()
+
+        def screen():
+            answered = any(p["keys"] == ["y"]
+                           for p in self.stub.params_for("pane.send_keys"))
+            return "> " if answered else GROK_TRUST_SCREEN
+
+        with patch.object(wrapper, "screen", side_effect=screen), \
+                patch.object(runner, "READY_IDLE_SECONDS", 0.05):
+            self.assertTrue(wrapper.wait_until_ready(seconds=5))
+        self.assertEqual([p["keys"] for p in self.stub.params_for("pane.send_keys")],
+                         [["y"]])
+        self.assertEqual(self.stub.typed(), [])
+        self.assertTrue(rec["trust_approved"])
 
     def test_old_trust_text_does_not_answer_the_current_composer(self):
         rec = self.make_live_record()
