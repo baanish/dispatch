@@ -11,7 +11,7 @@ default_lane = "astra@medium"
 
 [lanes.luna]
 driver = "codex"
-model = "gpt-5.6-luna"
+model = "gpt-6-luna"
 efforts = ["high", "xhigh", "max"]
 tier = "priority"
 alt_tiers = ["default", "priority"]
@@ -19,7 +19,7 @@ tier_aliases = { fast = "priority" }
 
 [lanes.sol]
 driver = "codex"
-model = "gpt-5.6-sol"
+model = "gpt-6-sol"
 efforts = ["medium", "high", "xhigh", "max"]
 tier = "default"
 alt_tiers = ["default", "priority"]
@@ -35,7 +35,7 @@ tier_aliases = { fast = "priority" }
 
 [lanes.opus]
 driver = "claude"
-model = "claude-opus-5"
+model = "claude-opus-5-5"
 efforts = ["medium", "high"]
 
 [lanes.fable]

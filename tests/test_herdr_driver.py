@@ -588,13 +588,13 @@ class TestSpawnPath(HerdrTestCase):
     def test_the_substrates_own_spawn_is_tried_first_with_the_drivers_kind(self):
         spawn = self.substrate().start_worker(
             self.worker_with_agent(), drivers.get_driver("codex"),
-            ["codex", "-m", "gpt-5.6-sol"])
+            ["codex", "-m", "gpt-6-sol"])
         self.assertEqual(spawn.method, "agent.start")
         self.assertEqual(spawn.flag, "")
         params = self.params_for("agent.start")[0]
         self.assertEqual(params["kind"], "codex")
         self.assertEqual(params["pane_id"], self.pane_id)
-        self.assertEqual(params["args"], ["-m", "gpt-5.6-sol"])
+        self.assertEqual(params["args"], ["-m", "gpt-6-sol"])
         self.assertNotIn("pane.send_text", self.methods())
 
     def test_every_lane_driver_names_an_agent_kind(self):
@@ -608,13 +608,13 @@ class TestSpawnPath(HerdrTestCase):
         self.stub.errors["agent.start"] = ERRORS["unsupported_agent_kind"]
         spawn = self.substrate().start_worker(
             self.worker_with_agent(), drivers.get_driver("codex"),
-            ["codex", "-m", "gpt-5.6-sol"])
+            ["codex", "-m", "gpt-6-sol"])
         self.assertEqual(spawn.method, "send-text")
         # `command` bypasses the user's zsh `codex` function;
         # PowerShell has no such builtin, so there the line is the call operator.
         self.assertEqual(self.params_for("pane.send_text")[0]["text"],
-                         "& 'codex' '-m' 'gpt-5.6-sol'" if processes.IS_WINDOWS
-                         else "command codex -m gpt-5.6-sol")
+                         "& 'codex' '-m' 'gpt-6-sol'" if processes.IS_WINDOWS
+                         else "command codex -m gpt-6-sol")
         self.assertEqual(self.params_for("pane.send_keys")[0]["keys"], ["enter"])
         self.assertIn("HERDR FALLBACK", spawn.flag)
         self.assertIn("unsupported_agent_kind", spawn.error)
@@ -628,7 +628,7 @@ class TestSpawnPath(HerdrTestCase):
         self.stub.pane(self.pane_id).running = True
         spawn = self.substrate().start_worker(
             self.worker_with_agent(), drivers.get_driver("codex"),
-            ["codex", "-m", "gpt-5.6-sol"])
+            ["codex", "-m", "gpt-6-sol"])
         self.assertEqual(spawn.method, "agent.start")
         self.assertIn("HERDR SPAWN UNCONFIRMED", spawn.flag)
         self.assertIn("unsupported_agent_kind", spawn.error)

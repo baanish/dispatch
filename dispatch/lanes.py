@@ -53,16 +53,16 @@ class Lane:
 # The lane set a fresh install starts with. Speed is bought only when the caller
 # is waiting on it, so a faster tier is a `:suffix` rather than the standing one.
 DEFAULT_LANE_TABLE = {
-    "luna": LaneSpec("codex", "gpt-5.6-luna", ("high", "xhigh", "max"),
+    "luna": LaneSpec("codex", "gpt-6-luna", ("high", "xhigh", "max"),
                      tier="priority", alt_tiers=("default", "priority"),
                      tier_aliases={"fast": "priority"}),
-    "sol": LaneSpec("codex", "gpt-5.6-sol", ("medium", "high", "xhigh", "max"),
+    "sol": LaneSpec("codex", "gpt-6-sol", ("medium", "high", "xhigh", "max"),
                     tier="default", alt_tiers=("default", "priority"),
                     tier_aliases={"fast": "priority"}),
     "astra": LaneSpec("codex", "gpt-6-astra", ("medium", "high", "xhigh"),
                       tier="default", alt_tiers=("default", "priority"),
                       tier_aliases={"fast": "priority"}),
-    "opus": LaneSpec("claude", "claude-opus-5", ("medium", "high")),
+    "opus": LaneSpec("claude", "claude-opus-5-5", ("medium", "high")),
     "grok": LaneSpec("grok", "grok-4.7", ("high",)),
 }
 

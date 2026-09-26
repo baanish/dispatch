@@ -167,7 +167,7 @@ class TestLanes(HerdrStubTestCase):
         lane = lanes.resolve_lane("sol@medium")
         self.assertEqual(
             launch_argv(lane, records.RunOptions(dir="/w")),
-            ["codex", "-m", "gpt-5.6-sol",
+            ["codex", "-m", "gpt-6-sol",
              "-c", "model_reasoning_effort=medium",
              "-c", "service_tier=default",
              "-a", "on-request",
@@ -178,7 +178,7 @@ class TestLanes(HerdrStubTestCase):
         lane = lanes.resolve_lane("sol@medium")
         self.assertEqual(
             launch_argv(lane, records.RunOptions(dir="/w", write=True)),
-            ["codex", "-m", "gpt-5.6-sol",
+            ["codex", "-m", "gpt-6-sol",
              "-c", "model_reasoning_effort=medium",
              "-c", "service_tier=default",
              "-a", "on-request",
@@ -190,7 +190,7 @@ class TestLanes(HerdrStubTestCase):
         luna = launch_argv(lanes.resolve_lane("luna@high"),
                            records.RunOptions(dir="/w"))
         self.assertIn("service_tier=priority", luna)
-        self.assertEqual(luna[luna.index("-m") + 1], "gpt-5.6-luna")
+        self.assertEqual(luna[luna.index("-m") + 1], "gpt-6-luna")
         self.assertIn("model_reasoning_effort=high", luna)
 
     def test_a_tier_suffix_changes_only_the_tier(self):
@@ -214,7 +214,7 @@ class TestLanes(HerdrStubTestCase):
                                         session_id="00000000-1111-2222-3333-444444444444")
         self.assertEqual(argv, [
             "claude",
-            "--model", "claude-opus-5",
+            "--model", "claude-opus-5-5",
             "--effort", "high",
             "--permission-mode", "auto",
             "--allowedTools", "Read,Grep,Glob",
@@ -465,6 +465,16 @@ class TestRunArgvOrder(HerdrStubTestCase):
     def test_other_subcommands_still_refuse_stray_arguments(self):
         with self.assertRaises(SystemExit):
             self.run_cli("status", "stray-argument")
+
+    def test_help_is_a_verb_as_well_as_a_flag(self):
+        for argv in (("help",), ("help", "logs")):
+            with self.subTest(argv=argv), self.assertRaises(SystemExit) as exit_:
+                self.run_cli(*argv)
+            self.assertEqual(exit_.exception.code, 0)
+
+    def test_the_watcher_verb_runs_without_being_advertised(self):
+        self.assertNotIn("_watch", cli.build_parser().format_usage())
+        self.assertEqual(self.run_cli("_watch", "not-a-run"), cli.EXIT_USAGE)
 
 
 # --------------------------------------------------------------------------
@@ -1987,7 +1997,7 @@ class TestStatusLog(HerdrStubTestCase):
         head = lines.index(f"lane: {rec['lane']}")
         self.assertEqual(lines[head + 1], f"pid: {rec['shell_pid']}")
         self.assertEqual(lines[head + 2], f"cwd: {rec['cwd']}")
-        self.assertTrue(lines[head + 3].startswith("cmd: codex -m gpt-5.6-luna"))
+        self.assertTrue(lines[head + 3].startswith("cmd: codex -m gpt-6-luna"))
         self.assertLessEqual(len(lines[head + 3]) - len("cmd: "), 200)
         self.assertRegex(lines[head + 4],
                          r"^started: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")

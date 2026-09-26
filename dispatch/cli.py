@@ -1657,6 +1657,11 @@ def cmd_agents_snippet(args):
     return EXIT_OK
 
 
+def cmd_help(args):
+    """`dispatch help [verb]` prints what `--help` would, then exits."""
+    build_parser().parse_args([args.verb, "--help"] if args.verb else ["--help"])
+
+
 # --------------------------------------------------------------------------
 # The internal watcher
 # --------------------------------------------------------------------------
@@ -1828,9 +1833,9 @@ def build_parser():
                               help="print the AGENTS.md snippet")
     snippet.set_defaults(func=cmd_agents_snippet)
 
-    internal_watch = subs.add_parser("_watch")
-    internal_watch.add_argument("id")
-    internal_watch.set_defaults(func=cmd_watch_run)
+    help_ = subs.add_parser("help", help="print this help, or one verb's")
+    help_.add_argument("verb", nargs="?")
+    help_.set_defaults(func=cmd_help)
 
     return parser
 
@@ -1871,11 +1876,17 @@ def main(argv=None):
 
 def run_verb(argv=None):
     """One verb, against the config already in force."""
-    parser = build_parser()
-    args = parse_cli(parser, argv if argv is not None else sys.argv[1:])
-    if not getattr(args, "func", None):
-        parser.print_help()
-        return EXIT_USAGE
+    argv = sys.argv[1:] if argv is None else list(argv)
+    if len(argv) == 2 and argv[0] == "_watch":
+        # The detached watcher's entry point, left off the parser so an
+        # operator never sees it in a usage line or an invalid-choice error.
+        args = argparse.Namespace(id=argv[1], func=cmd_watch_run)
+    else:
+        parser = build_parser()
+        args = parse_cli(parser, argv)
+        if not getattr(args, "func", None):
+            parser.print_help()
+            return EXIT_USAGE
     try:
         return args.func(args)
     except DispatchError as exc:

@@ -173,7 +173,7 @@ what the worker's CLI printed on its own.
 ```
 opus@medium-183640-1ed5  opus@medium  done
 
-START 2026-01-01T18:36:40Z claude --permission-mode auto --model claude-opus-5
+START 2026-01-01T18:36:40Z claude --permission-mode auto --model claude-opus-5-5
 PROMPT 2026-01-01T18:36:44Z via paste
 ALIVE 2026-01-01T18:36:59Z worker running
 EXIT 2026-01-01T18:41:01Z rc=0
