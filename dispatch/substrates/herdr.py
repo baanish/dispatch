@@ -94,10 +94,6 @@ SPAWN_POLL_SECONDS = 0.2
 # The opt-out, for a caller that must never start a daemon: a test suite that
 # points the client at a socket which was never there.
 SPAWN_ENV = "DISPATCH_HERDR_SPAWN"
-# Homebrew installs herdr as a LaunchAgent on macOS, so the bounce there goes
-# through launchctl and not `kill`: launchd would restart a killed daemon
-# underneath the operator, with the same ownership it had before.
-MACOS_SERVICE = "homebrew.mxcl.herdr"
 
 # Attaching is plain `herdr`: it attaches to the persistent session, and the
 # workspace dispatch focused is the one it lands on. There is no per-pane attach
@@ -254,12 +250,19 @@ def daemon_process():
 
 
 def bounce_command(pid):
-    """The one line that restarts a daemon this session is not allowed to touch."""
+    """The one line that restarts a daemon this session is not allowed to touch.
+
+    Homebrew installs herdr as a LaunchAgent on macOS, so the bounce there goes
+    through `brew services` and not `kill`: launchd would restart a killed
+    daemon underneath the operator, with the same ownership it had before.
+    The LaunchAgent's label is Homebrew's to choose (`sh.brew.herdr` today), so
+    the line names the formula and never the label.
+    """
     if IS_WINDOWS:
         return (f"Stop-Process -Id {pid or '<pid>'} -Force; "
                 "Start-Process herdr -ArgumentList 'server'")
     if IS_MACOS:
-        return f"launchctl kickstart -k gui/{os.getuid()}/{MACOS_SERVICE}"
+        return "brew services restart herdr"
     return f"kill {pid or '<pid>'} && herdr server"
 
 
