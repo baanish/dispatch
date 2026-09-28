@@ -16,6 +16,7 @@ import json
 import os
 import re
 import shlex
+import shutil
 import sys
 import tempfile
 import time
@@ -1605,10 +1606,15 @@ def smoke_test(lane_text):
     """
     lane_text = lane_text or default_lane()
     print(f"\nsmoke\n  running one small task on {lane_text} (a real model call)...")
-    with tempfile.TemporaryDirectory(prefix="dispatch-smoke-") as scratch:
-        brief = Path(scratch) / "brief.md"
+    # Not tempfile.mkdtemp: on Windows its 0o700 directory admits only SYSTEM,
+    # Administrators, and its owner, so one made from an elevated ssh session
+    # is unreadable to the worker in a non-elevated herdr pane.
+    scratch = Path(tempfile.gettempdir()) / f"dispatch-smoke-{os.urandom(4).hex()}"
+    scratch.mkdir()
+    try:
+        brief = scratch / "brief.md"
         brief.write_text(SMOKE_BRIEF, encoding="utf-8")
-        work = Path(scratch) / "work"
+        work = scratch / "work"
         work.mkdir()
         run = build_parser().parse_args(
             ["run", lane_text, str(brief), "--dir", str(work), "--deadline", "5m"])
@@ -1619,6 +1625,8 @@ def smoke_test(lane_text):
                 cmd_run(run)
         except DispatchError as exc:
             error = str(exc)
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)
     took = int(time.monotonic() - started)
     rec = next((r for r in all_records() if r["id"] not in before), None)
     if rec is None:
