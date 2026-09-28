@@ -1623,7 +1623,8 @@ def smoke_test(lane_text):
     # The work directory is this smoke's alone; a run that is merely new could
     # be a concurrent smoke's, or any other launch on this machine.
     rec = next((r for r in all_records()
-                if r["id"] not in before and r.get("cwd") == str(work)), None)
+                if r["id"] not in before
+                and r.get("cwd") == os.path.abspath(work)), None)
     if rec is None:
         print(f"  FAIL  {lane_text}  never started: {error}")
         return False
