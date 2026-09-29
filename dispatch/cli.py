@@ -16,6 +16,7 @@ import json
 import os
 import re
 import shlex
+import shutil
 import sys
 import tempfile
 import time
@@ -35,7 +36,7 @@ from .errors import DispatchError
 from .lanes import (default_lane, lane_names, looks_like_lane, resolve_lane,
                     valid_lanes_hint)
 from .policy import current_depth, enforce_depth, parse_deadline, policy
-from .processes import checked_pid, stop_pid
+from .processes import IS_WINDOWS, checked_pid, stop_pid
 from .prompt import steer_prompt
 from .records import (RunOptions, all_records, append_status,
                       deliverable_path,
@@ -1605,10 +1606,16 @@ def smoke_test(lane_text):
     """
     lane_text = lane_text or default_lane()
     print(f"\nsmoke\n  running one small task on {lane_text} (a real model call)...")
-    with tempfile.TemporaryDirectory(prefix="dispatch-smoke-") as scratch:
-        brief = Path(scratch) / "brief.md"
+    # Not tempfile.mkdtemp: on Windows its 0o700 directory admits only SYSTEM,
+    # Administrators, and its owner, so one made from an elevated ssh session
+    # is unreadable to the worker in a non-elevated herdr pane. Elsewhere 0o700
+    # stays, so no other account can plant instructions in the worker's cwd.
+    scratch = Path(tempfile.gettempdir()) / f"dispatch-smoke-{os.urandom(4).hex()}"
+    scratch.mkdir(mode=0o777 if IS_WINDOWS else 0o700)
+    try:
+        brief = scratch / "brief.md"
         brief.write_text(SMOKE_BRIEF, encoding="utf-8")
-        work = Path(scratch) / "work"
+        work = scratch / "work"
         work.mkdir()
         run = build_parser().parse_args(
             ["run", lane_text, str(brief), "--dir", str(work), "--deadline", "5m"])
@@ -1619,6 +1626,8 @@ def smoke_test(lane_text):
                 cmd_run(run)
         except DispatchError as exc:
             error = str(exc)
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)
     took = int(time.monotonic() - started)
     # The work directory is this smoke's alone; a run that is merely new could
     # be a concurrent smoke's, or any other launch on this machine.
