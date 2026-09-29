@@ -681,7 +681,8 @@ def resolve_transcript(rec, session_id="", hint=""):
                                      hint or rec.get("transcript", ""))
 
 
-TRUST_CURSOR = "\u276f"
+# claude marks the highlighted option with \u276f, codex with \u203a.
+TRUST_CURSORS = ("\u276f", "\u203a")
 
 
 def trust_dialog_keys(screen, rules):
@@ -696,7 +697,8 @@ def trust_dialog_keys(screen, rules):
         return tuple(rules.trust_keys)
     rows = (screen or "").lower().splitlines()
     accept = [i for i, row in enumerate(rows) if rules.trust_accept in row]
-    cursor = [i for i, row in enumerate(rows) if TRUST_CURSOR in row]
+    cursor = [i for i, row in enumerate(rows)
+              if any(glyph in row for glyph in TRUST_CURSORS)]
     if not accept or not cursor:
         return ()
     moves = accept[-1] - cursor[-1]

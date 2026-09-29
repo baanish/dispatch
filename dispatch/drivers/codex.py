@@ -97,10 +97,15 @@ class CodexDriver(Driver):
                       "please restart codex")
     # codex opens with a directory-trust dialog that no config override
     # pre-empts. Detection names the rule precisely, so answering it is specific
-    # rather than a blind enter, and `1` is "Yes, continue".
+    # rather than a blind enter, and `1` is "Yes, continue". codex 0.157 on
+    # Windows draws a different one ("Trust this folder?", "1. Trust and
+    # continue") that herdr reports as idle, so it is recognised by its words.
     dialog_rules = DialogRules(
         answered_rules=("trust_directory",),
         answer_text="1",
+        trust_markers=("trust this folder?", "trust and continue"),
+        trust_keys=("enter",),
+        trust_accept="trust and continue",
         trust_attempts=2,
         screen_marker="do you trust")
     metered_key_vars = ("OPENAI_API_KEY",)
