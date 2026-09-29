@@ -291,7 +291,7 @@ class TestTransportSelfHeal(HerdrTestCase):
         message = str(caught.exception)
         self.assertIn("another security context", message)
         self.assertIn("Stop-Process -Id " if processes.IS_WINDOWS
-                      else "launchctl kickstart -k" if processes.IS_MACOS
+                      else "brew services restart herdr" if processes.IS_MACOS
                       else "kill ", message)
         self.assertEqual(transport.attempts, 1, "a refusal must not be retried")
         self.assertEqual(self.spawns, [], "a bound endpoint cannot be respawned")
@@ -303,8 +303,7 @@ class TestTransportSelfHeal(HerdrTestCase):
             self.assertEqual(line, "Stop-Process -Id 4321 -Force; "
                                    "Start-Process herdr -ArgumentList 'server'")
         elif processes.IS_MACOS:
-            self.assertEqual(line, f"launchctl kickstart -k "
-                                   f"gui/{os.getuid()}/{herdr.MACOS_SERVICE}")
+            self.assertEqual(line, "brew services restart herdr")
         else:
             self.assertEqual(line, "kill 4321 && herdr server")
 
