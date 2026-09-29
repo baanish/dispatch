@@ -919,7 +919,7 @@ class HerdrSubstrate(Substrate):
             result = self.client.call("pane.read", params)
         except HerdrError:
             return ""
-        text = (result.get("read") or {}).get("text", "")
+        text = (result.get("read") or {}).get("text") or ""
         # herdr's recent history comes back empty for codex on Windows, whose
         # whole session is only in the visible screen.
         if not text.strip() and source == "recent_unwrapped":
