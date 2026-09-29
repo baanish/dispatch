@@ -25,7 +25,8 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from herdr_stub import (CLAUDE_TRUST_SCREEN, CLAUDE_UPDATE_SCREEN,  # noqa: E402
-                        CODEX_UPDATE_SCREEN, GROK_TRUST_SCREEN, GROK_UPDATE_SCREEN,
+                        CODEX_TRUST_SCREEN, CODEX_UPDATE_SCREEN,
+                        GROK_TRUST_SCREEN, GROK_UPDATE_SCREEN,
                         METERED_VARS,
                         DISPATCH_ARGV, REPO_ROOT, HerdrStubTestCase, caps, cli,
                         drivers, errors, herdr, lanes, launch_argv, policy,
@@ -4072,6 +4073,33 @@ class TestTrustDialog(HerdrStubTestCase):
             self.assertTrue(wrapper.wait_until_ready(seconds=5))
         self.assertEqual([p["keys"] for p in self.stub.params_for("pane.send_keys")],
                          [["y"]])
+        self.assertEqual(self.stub.typed(), [])
+        self.assertTrue(rec["trust_approved"])
+
+    def test_codex_folder_trust_herdr_reports_idle_is_answered_not_typed_into(self):
+        """codex 0.157 on Windows asks "Trust this folder?" and herdr calls it
+        idle; a brief typed there is keypresses, and codex quits on them."""
+        codex = drivers.get_driver("codex")
+        self.assertEqual(runner.trust_dialog_keys(CODEX_TRUST_SCREEN,
+                                                  codex.dialog_rules), ("enter",))
+        rec = self.make_live_record()
+        pane = self.stub.panes[rec["worker_id"]]
+        pane.agent_name = rec["agent"]
+        pane.running = True
+        pane.status = "idle"
+        wrapper = runner.RunWrapper(self.substrate(), rec)
+        wrapper.attach()
+
+        def screen():
+            answered = any(p["keys"] == ["enter"]
+                           for p in self.stub.params_for("pane.send_keys"))
+            return "› Ask anything" if answered else CODEX_TRUST_SCREEN
+
+        with patch.object(wrapper, "screen", side_effect=screen), \
+                patch.object(runner, "READY_IDLE_SECONDS", 0.05):
+            self.assertTrue(wrapper.wait_until_ready(seconds=5))
+        self.assertEqual([p["keys"] for p in self.stub.params_for("pane.send_keys")],
+                         [["enter"]])
         self.assertEqual(self.stub.typed(), [])
         self.assertTrue(rec["trust_approved"])
 
